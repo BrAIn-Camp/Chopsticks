@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Energy Flux / Background Glow for Foreground -->
+    <path
+        android:pathData="M54,54m-40,0a40,40 0 1,1 80,0a40,40 0 1,1 -80,0">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:centerX="54"
+                android:centerY="54"
+                android:gradientRadius="40"
+                android:type="radial">
+                <item android:color="#33FFEA00" android:offset="0.0" />
+                <item android:color="#00FFEA00" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Chopstick 1: Top-Left to Bottom-Right -->
+    <group android:name="chopstick1">
+        <!-- Main Core -->
+        <path
+            android:fillColor="@color/vibrant_yellow"
+            android:pathData="M32,32 L76,76 L78,74 L34,30 Z" />
+        <!-- Digital Energy Pattern -->
+        <path
+            android:fillColor="@color/neon_orange"
+            android:pathData="M36,36 L40,40 L41,39 L37,35 Z M50,50 L56,56 L57,55 L51,49 Z M68,68 L72,72 L73,71 L69,67 Z" />
+        <!-- Glow Tip -->
+        <path
+            android:fillColor="@color/white"
+            android:pathData="M76,76 L80,80 L82,78 L78,74 Z" />
+    </group>
+
+    <!-- Chopstick 2: Top-Right to Bottom-Left -->
+    <group android:name="chopstick2">
+        <!-- Main Core -->
+        <path
+            android:fillColor="@color/vibrant_yellow"
+            android:pathData="M76,32 L32,76 L30,74 L74,30 Z" />
+        <!-- Digital Energy Pattern -->
+        <path
+            android:fillColor="@color/neon_orange"
+            android:pathData="M72,36 L68,40 L67,39 L71,35 Z M58,50 L52,56 L51,55 L57,49 Z M40,68 L36,72 L35,71 L39,67 Z" />
+        <!-- Glow Tip -->
+        <path
+            android:fillColor="@color/white"
+            android:pathData="M32,76 L28,80 L26,78 L30,74 Z" />
+    </group>
+
+    <!-- Central Interactive Art Accent -->
+    <path
+        android:fillColor="@color/neon_orange"
+        android:pathData="M54,46 L62,54 L54,62 L46,54 Z" />
+    <path
+        android:strokeColor="@color/white"
+        android:strokeWidth="0.5"
+        android:pathData="M54,48 L60,54 L54,60 L48,54 Z" />
+
+    <!-- Sharp Geometric Floating Elements -->
+    <path
+        android:fillColor="@color/vibrant_yellow"
+        android:pathData="M20,54 L24,50 L28,54 L24,58 Z M80,54 L84,50 L88,54 L84,58 Z M54,20 L58,24 L54,28 L50,24 Z M54,80 L58,84 L54,88 L50,84 Z" />
+
+    <!-- Digital Energy Lines -->
+    <path
+        android:strokeColor="@color/neon_orange"
+        android:strokeWidth="0.3"
+        android:pathData="M15,15 L25,25 M93,93 L83,83 M93,15 L83,25 M15,93 L25,83" />
+    <path
+        android:strokeColor="@color/vibrant_yellow"
+        android:strokeWidth="0.2"
+        android:pathData="M10,54 H30 M78,54 H98 M54,10 V30 M54,78 V98" />
+
+</vector>
