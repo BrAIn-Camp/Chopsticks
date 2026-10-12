@@ -4,10 +4,12 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.remember
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.runtime.NavKey
+import androidx.navigation3.runtime.rememberNavBackStack
+import androidx.compose.runtime.LaunchedEffect
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.chopsticks.domain.model.GameMode
 import androidx.navigation3.ui.NavDisplay
 import com.example.chopsticks.ui.MainMenu
 import com.example.chopsticks.ui.ConfigurationScreen
@@ -20,10 +22,7 @@ import com.example.chopsticks.ui.theme.ChopsticksTheme
 import kotlinx.serialization.Serializable
 
 import com.example.chopsticks.domain.model.RulesetConfig
-import com.example.chopsticks.ui.theme.HandTheme
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.collectAsState
 
 @Serializable
@@ -49,14 +48,14 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            var currentTheme by remember { mutableStateOf<HandTheme>(HandTheme.AnalogSynth) }
-            val settingsRepository = remember { SettingsRepository(applicationContext) }
-            val gameViewModel = remember { GameViewModel(settingsRepository) }
+            // viewModel() keeps the game alive across rotation and other configuration changes
+            val gameViewModel: GameViewModel = viewModel { GameViewModel(SettingsRepository(applicationContext)) }
+            val currentTheme by gameViewModel.theme.collectAsState()
             val rulesetConfig by gameViewModel.rulesetConfig.collectAsState()
             val difficulty by gameViewModel.difficulty.collectAsState()
 
             ChopsticksTheme {
-                val backStack = remember { mutableStateListOf<NavKey>(ChopsticksRoute.MainMenu) }
+                val backStack = rememberNavBackStack(ChopsticksRoute.MainMenu)
 
                 NavDisplay(
                     backStack = backStack,
@@ -74,7 +73,7 @@ class MainActivity : ComponentActivity() {
                                     MainMenu(
                                         currentRuleset = rulesetConfig,
                                         currentTheme = currentTheme,
-                                        onThemeChange = { currentTheme = it },
+                                        onThemeChange = { gameViewModel.updateTheme(it) },
                                         onStartGame = { mode ->
                                             gameViewModel.startGame(mode, rulesetConfig, difficulty)
                                             backStack.add(
@@ -120,6 +119,11 @@ class MainActivity : ComponentActivity() {
                             }
                             is ChopsticksRoute.Game -> {
                                 NavEntry(key) {
+                                    // If Android restored this screen after closing the app in the background,
+                                    // the game itself is gone: start a fresh one in the same mode.
+                                    LaunchedEffect(key) {
+                                        gameViewModel.ensureGameStarted(GameMode.valueOf(key.mode), rulesetConfig, difficulty)
+                                    }
                                     GameScreen(
                                         viewModel = gameViewModel,
                                         theme = currentTheme,

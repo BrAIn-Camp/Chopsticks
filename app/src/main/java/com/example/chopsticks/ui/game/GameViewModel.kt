@@ -11,6 +11,7 @@ import com.example.chopsticks.domain.model.GameMode
 import com.example.chopsticks.domain.model.Difficulty
 import com.example.chopsticks.domain.model.Player
 import com.example.chopsticks.domain.model.Position
+import com.example.chopsticks.ui.theme.HandTheme
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,6 +30,11 @@ class GameViewModel(private val repository: SettingsRepository) : ViewModel() {
     private val _difficulty = MutableStateFlow(repository.loadDifficulty())
     val difficulty: StateFlow<Difficulty> = _difficulty.asStateFlow()
 
+    private val _theme = MutableStateFlow(
+        HandTheme.allThemes.find { it.name == repository.loadThemeName() } ?: HandTheme.AnalogSynth
+    )
+    val theme: StateFlow<HandTheme> = _theme.asStateFlow()
+
     private val _uiState = MutableStateFlow(GameState())
     val uiState: StateFlow<GameState> = _uiState.asStateFlow()
 
@@ -46,6 +52,7 @@ class GameViewModel(private val repository: SettingsRepository) : ViewModel() {
     private var aiDifficulty: Difficulty = Difficulty.EASY
     private val aiPlayerId = "Player 2"
     private var isMovePending = false
+    private var hasStartedGame = false
 
     /** The move animation and any AI reply that follows it. Cancelled when a new game starts. */
     private var moveJob: Job? = null
@@ -64,6 +71,11 @@ class GameViewModel(private val repository: SettingsRepository) : ViewModel() {
         repository.saveDifficulty(newDifficulty)
     }
 
+    fun updateTheme(newTheme: HandTheme) {
+        _theme.value = newTheme
+        repository.saveThemeName(newTheme.name)
+    }
+
     fun restoreToDefaults() {
         val defaultRuleset = RulesetConfig()
         val defaultDifficulty = Difficulty.EASY
@@ -79,6 +91,7 @@ class GameViewModel(private val repository: SettingsRepository) : ViewModel() {
     fun startGame(mode: GameMode, ruleset: RulesetConfig, difficulty: Difficulty = Difficulty.EASY) {
         moveJob?.cancel()
         clearHint()
+        hasStartedGame = true
         gameMode = mode
         aiDifficulty = difficulty
         isMovePending = false
@@ -90,6 +103,11 @@ class GameViewModel(private val repository: SettingsRepository) : ViewModel() {
         )
         positionCounts.clear()
         _uiState.value = recordPosition(state)
+    }
+
+    /** Starts a game unless one has already been started in this ViewModel. */
+    fun ensureGameStarted(mode: GameMode, ruleset: RulesetConfig, difficulty: Difficulty) {
+        if (!hasStartedGame) startGame(mode, ruleset, difficulty)
     }
 
     fun requestHint() {
