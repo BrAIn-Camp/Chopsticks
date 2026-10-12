@@ -54,7 +54,7 @@ class MainActivity : ComponentActivity() {
             val rulesetConfig by gameViewModel.rulesetConfig.collectAsState()
             val difficulty by gameViewModel.difficulty.collectAsState()
 
-            ChopsticksTheme {
+            ChopsticksTheme(handTheme = currentTheme) {
                 val backStack = rememberNavBackStack(ChopsticksRoute.MainMenu)
 
                 NavDisplay(

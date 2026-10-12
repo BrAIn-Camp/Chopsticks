@@ -118,6 +118,18 @@ fun GameOverOverlay(
                     modifier = Modifier.width(200.dp)
                 )
             }
+        } else if (theme is HandTheme.Ombromanie) {
+            ShadowIntertitle(
+                result = resultText(state),
+                subtitle = when {
+                    winner == null -> "The shadows were evenly matched."
+                    gameMode == GameMode.PvE && winner == "Player 1" -> "The lamp is lowered on your triumph."
+                    gameMode == GameMode.PvE -> "The computer's shadow takes the bow."
+                    else -> "The lamp is lowered. The curtain falls."
+                }
+            ) {
+                ArtisticActionButton(text = "Encore", onClick = onRestart, theme = theme)
+            }
         } else {
             // Paper Cutout
             Box(

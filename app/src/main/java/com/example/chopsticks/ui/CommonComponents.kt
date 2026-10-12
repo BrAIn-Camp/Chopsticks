@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.style.TextAlign
 import com.example.chopsticks.ui.theme.HandTheme
+import com.example.chopsticks.ui.theme.ShadowTicketButton
 import kotlinx.coroutines.delay
 import kotlin.random.Random
 import androidx.compose.ui.graphics.*
@@ -209,6 +210,8 @@ fun ArtisticActionButton(
                 )
             }
         }
+    } else if (theme is HandTheme.Ombromanie) {
+        ShadowTicketButton(text, onClick, modifier, enabled, buttonAlpha)
     } else {
         Box(
             modifier = modifier

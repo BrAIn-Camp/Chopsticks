@@ -17,6 +17,7 @@ import androidx.compose.ui.graphics.drawscope.*
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.*
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -73,6 +74,8 @@ fun ThemeTurnOverlay(
         } else null
     }
 
+    val flicker = if (theme is HandTheme.Ombromanie) rememberCandleFlicker() else null
+
     Canvas(modifier = Modifier.fillMaxSize()) {
         when (theme) {
             is HandTheme.AnalogSynth -> {
@@ -80,6 +83,15 @@ fun ThemeTurnOverlay(
             }
             is HandTheme.PaperCutout -> {
                 drawPaperCutoutTurn(p1Area, p1Progress, p2Area, p2Progress, theme)
+            }
+            is HandTheme.Ombromanie -> {
+                // The lamp swings toward whoever's turn it is
+                val p1Center = p1Area?.center ?: Offset(size.width / 2, size.height * 0.8f)
+                val p2Center = p2Area?.center ?: Offset(size.width / 2, size.height * 0.2f)
+                val lamp = p2Center + (p1Center - p2Center) * (p1Progress / (p1Progress + p2Progress).coerceAtLeast(0.001f))
+                val f = flicker?.value ?: 0f
+                drawLampLitScreen(lamp, f)
+                drawSideCurtains(f)
             }
         }
     }
@@ -339,12 +351,22 @@ private fun ComputerThinkingStatus(p2Area: Rect?, theme: HandTheme) {
             }
             .padding(horizontal = 8.dp, vertical = 4.dp)
     ) {
-        Text(
-            text = "SYSTEM: THINKING...",
-            color = theme.textColor,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Bold,
-            fontFamily = FontFamily.Monospace
-        )
+        if (theme is HandTheme.Ombromanie) {
+            Text(
+                text = "the shadows deliberate…",
+                color = theme.textColor,
+                fontSize = 13.sp,
+                fontStyle = FontStyle.Italic,
+                fontFamily = FontFamily.Serif
+            )
+        } else {
+            Text(
+                text = "SYSTEM: THINKING...",
+                color = theme.textColor,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace
+            )
+        }
     }
 }

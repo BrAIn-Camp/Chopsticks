@@ -145,5 +145,6 @@ fun DrawScope.drawMovePath(
                 drawPath(arrowPath, theme.primaryColor)
             }
         }
+        is HandTheme.Ombromanie -> drawShadowMovePath(start, end, progress)
     }
 }

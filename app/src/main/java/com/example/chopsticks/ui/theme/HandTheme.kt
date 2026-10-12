@@ -42,6 +42,19 @@ sealed class HandTheme(
         isDark = false
     )
 
+    /** Hand shadows on a lamp-lit screen. See ShadowTheatre.kt. */
+    object Ombromanie : HandTheme(
+        name = "Ombromanie",
+        backgroundColor = Color(0xFFEFD9A9),
+        primaryColor = Color(0xFF7E1A16),
+        secondaryColor = Color(0xFFD9A25F),
+        handColor = Color(0xFF15100E),
+        fingerColor = Color(0xFF15100E),
+        textColor = Color(0xFF22140F),
+        cornerRadius = 0.dp,
+        isDark = false
+    )
+
     companion object {
         /**
          * Returns all available themes. We use a getter to ensure that the objects
@@ -50,7 +63,8 @@ sealed class HandTheme(
         val allThemes: List<HandTheme>
             get() = listOfNotNull(
                 AnalogSynth,
-                PaperCutout
+                PaperCutout,
+                Ombromanie
             )
     }
 }

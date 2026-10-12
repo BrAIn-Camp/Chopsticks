@@ -73,6 +73,12 @@ fun ThemedHand(
                     val h = size.height
                     val jitter = if (theme.organicEdges) 4f else 0f
 
+                    if (isDead && theme is HandTheme.Ombromanie) {
+                        val ghostRect = Rect(Offset(w * 0.14f, h * 0.48f), Size(w * 0.72f, h * 0.48f))
+                        drawShadowGhost(ghostRect, isLeftHand, h, pulse)
+                        return@onDrawWithContent
+                    }
+
                     if (isDead) {
                         drawRect(Color.Gray.copy(alpha = 0.1f))
                         drawLine(
@@ -174,6 +180,7 @@ fun ThemedHand(
                             drawCircle(theme.primaryColor.copy(alpha = 0.6f), 20.dp.toPx(), Offset(palmRect.left + 20.dp.toPx(), palmRect.top + 25.dp.toPx()))
                             drawCircle(theme.primaryColor.copy(alpha = 0.4f), 12.dp.toPx(), Offset(palmRect.right - 25.dp.toPx(), palmRect.bottom - 15.dp.toPx()))
                         }
+                        is HandTheme.Ombromanie -> drawShadowPalm(palmRect, isLeftHand, bottom = h)
                     }
 
                     // --- DRAW FINGERS ---
@@ -421,6 +428,12 @@ private fun DrawScope.drawAnatomicalFinger(
                         quadraticTo(currentBase.x, currentBase.y - segLength * 0.7f, currentBase.x + segW * 0.4f, currentBase.y - segLength * 0.55f)
                     }
                     drawPath(ridgePath, theme.textColor.copy(alpha = 0.25f), style = Stroke(1.5.dp.toPx()))
+                }
+                // A silhouette has no inner detail: the shape is everything
+                is HandTheme.Ombromanie -> {
+                    drawPath(finalPath, theme.fingerColor)
+                    // Same-colour outline seals the hairline seams between segments
+                    drawPath(finalPath, theme.fingerColor, style = Stroke(1.5.dp.toPx()))
                 }
             }
             

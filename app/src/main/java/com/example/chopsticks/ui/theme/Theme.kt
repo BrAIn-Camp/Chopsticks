@@ -1,5 +1,6 @@
 package com.example.chopsticks.ui.theme
 
+import androidx.compose.ui.text.font.FontFamily
 import android.app.Activity
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -54,6 +55,7 @@ fun ChopsticksTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     // Dynamic color is available on Android 12+
     dynamicColor: Boolean = false, // Set to false by default to preserve the abstract artistic style
+    handTheme: HandTheme? = null,
     content: @Composable () -> Unit
 ) {
     val colorScheme = when {
@@ -68,7 +70,7 @@ fun ChopsticksTheme(
 
     MaterialTheme(
         colorScheme = colorScheme,
-        typography = Typography,
+        typography = if (handTheme is HandTheme.Ombromanie) chopsticksTypography(FontFamily.Serif) else Typography,
         shapes = SharpShapes,
         content = content
     )

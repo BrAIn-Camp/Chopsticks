@@ -13,6 +13,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.unit.dp
 import com.example.chopsticks.ui.theme.HandTheme
+import com.example.chopsticks.ui.theme.ShadowTheatreBackground
 import kotlinx.coroutines.delay
 import kotlin.math.cos
 import kotlin.math.sin
@@ -23,10 +24,10 @@ private fun randomFloat(min: Float, max: Float): Float = (Random.nextFloat() * (
 @Composable
 fun DynamicBackground(theme: HandTheme, modifier: Modifier = Modifier) {
     Box(modifier = modifier.fillMaxSize()) {
-        if (theme.name.contains("Paper", ignoreCase = true) || theme.organicEdges) {
-            PaperCutoutBackground(theme = theme)
-        } else {
-            AnalogSynthBackground(theme = theme)
+        when (theme) {
+            is HandTheme.AnalogSynth -> AnalogSynthBackground(theme = theme)
+            is HandTheme.PaperCutout -> PaperCutoutBackground(theme = theme)
+            is HandTheme.Ombromanie -> ShadowTheatreBackground()
         }
     }
 }

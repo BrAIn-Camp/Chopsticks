@@ -287,6 +287,8 @@ fun ChopsticksBackground(
                     size = Size(30.dp.toPx() * scale, 10.dp.toPx() * scale)
                 )
             }
+
+            is HandTheme.Ombromanie -> drawShadowChopsticks(scale)
         }
     }
 }
