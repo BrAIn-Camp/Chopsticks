@@ -130,6 +130,18 @@ fun GameOverOverlay(
             ) {
                 ArtisticActionButton(text = "Encore", onClick = onRestart, theme = theme)
             }
+        } else if (theme is HandTheme.TerraFirma) {
+            val loser = if (winner == "Player 1") "Player 2" else "Player 1"
+            val playerLostToComputer = gameMode == GameMode.PvE && winner == "Player 2"
+            val (headline, color) = when {
+                winner == null -> "The battle ends in a stalemate." to TerraInk.EventGreen
+                gameMode == GameMode.PvE && winner == "Player 1" -> "The Computer has been defeated!" to TerraInk.BossPurple
+                playerLostToComputer -> "You were slain..." to TerraInk.SlainRed
+                else -> "$loser has been defeated!" to TerraInk.BossPurple
+            }
+            TerraEndScreen(headline, color, resultText(state)) {
+                ArtisticActionButton(text = if (playerLostToComputer) "Respawn" else "Play again", onClick = onRestart, theme = theme)
+            }
         } else if (theme is HandTheme.Marginalia) {
             ManuscriptColophon(
                 result = resultText(state),

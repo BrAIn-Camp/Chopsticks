@@ -211,7 +211,7 @@ private fun cloudPath(c: Offset, r: Float): Path {
 }
 
 /** A rounded finger: a capsule from [base] (slightly into the palm) out along [angleDeg]. */
-private fun capsule(base: Offset, angleDeg: Float, width: Float, length: Float): Path {
+internal fun capsule(base: Offset, angleDeg: Float, width: Float, length: Float): Path {
     val a = angleDeg * PI.toFloat() / 180f
     val r = width / 2f
     val pts = mutableListOf<Offset>()

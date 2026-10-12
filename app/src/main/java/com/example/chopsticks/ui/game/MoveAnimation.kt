@@ -14,16 +14,33 @@ import androidx.compose.ui.text.*
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.example.chopsticks.domain.ai.Move
+import com.example.chopsticks.domain.model.GameState
+import androidx.compose.ui.unit.sp
 import com.example.chopsticks.ui.theme.*
 import kotlin.random.Random
 
+/**
+ * How many fingers the last move sends, e.g. "+2", for themes that pop up damage numbers.
+ * During the move animation [state] is still the position before the move; an attack never
+ * changes the attacking hand, so its count is right either way.
+ */
+fun moveAmountLabel(state: GameState): String? = when (val move = state.lastMove) {
+    is Move.Attack -> {
+        val attacker = if (state.player1.id == move.playerId) state.player1 else state.player2
+        val fingers = if (move.fromHandIndex == 0) attacker.leftHand.fingers else attacker.rightHand.fingers
+        "+$fingers"
+    }
+    is Move.Transfer -> "+${move.amount}"
+    else -> null
+}
+
 @Composable
 fun ActionDisplayOverlay(
-
     lastMove: Move?,
     lastMoveTimestamp: Long,
     handBounds: Map<String, Rect>,
-    theme: HandTheme
+    theme: HandTheme,
+    label: String? = null
 ) {
     if (lastMove == null) return
 
@@ -70,6 +87,22 @@ fun ActionDisplayOverlay(
             val start = startRect.center
             val end = endRect.center
             drawMovePath(theme, start, end, animProgress.value)
+        }
+        // Terra Firma: an orange damage number pops out of the target and floats up
+        if (theme is HandTheme.TerraFirma && label != null && animProgress.value > 0.55f) {
+            val k = (animProgress.value - 0.55f) / 0.45f
+            TerraText(
+                label,
+                TerraInk.Damage,
+                fontSize = 26.sp,
+                modifier = Modifier.graphicsLayer {
+                    translationX = endRect.center.x - 20.dp.toPx()
+                    translationY = endRect.center.y - 40.dp.toPx() - k * 36.dp.toPx()
+                    val pop = 1f + 0.35f * (1f - k)
+                    scaleX = pop
+                    scaleY = pop
+                }
+            )
         }
     }
 }
@@ -118,5 +151,6 @@ fun DrawScope.drawMovePath(
         is HandTheme.PaperCutout -> drawPaperPlaneMove(start, end, progress)
         is HandTheme.Ombromanie -> drawShadowMovePath(start, end, progress)
         is HandTheme.Marginalia -> drawPenFlourish(start, end, progress)
+        is HandTheme.TerraFirma -> drawFallingStarMove(start, end, progress)
     }
 }

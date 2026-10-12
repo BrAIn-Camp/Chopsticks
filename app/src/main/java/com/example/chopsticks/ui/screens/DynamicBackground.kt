@@ -16,6 +16,7 @@ import com.example.chopsticks.ui.theme.HandTheme
 import com.example.chopsticks.ui.theme.ManuscriptBackground
 import com.example.chopsticks.ui.theme.PaperStageBackground
 import com.example.chopsticks.ui.theme.ShadowTheatreBackground
+import com.example.chopsticks.ui.theme.TerraMenuBackground
 import kotlinx.coroutines.delay
 import kotlin.math.cos
 import kotlin.math.sin
@@ -31,6 +32,7 @@ fun DynamicBackground(theme: HandTheme, modifier: Modifier = Modifier) {
             is HandTheme.PaperCutout -> PaperStageBackground()
             is HandTheme.Ombromanie -> ShadowTheatreBackground()
             is HandTheme.Marginalia -> ManuscriptBackground()
+            is HandTheme.TerraFirma -> TerraMenuBackground()
         }
     }
 }

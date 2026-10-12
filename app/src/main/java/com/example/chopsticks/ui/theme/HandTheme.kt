@@ -74,6 +74,20 @@ sealed class HandTheme(
         typeface = FontFamily.Serif
     )
 
+    /** A pixel-art sandbox world, after Terraria. See TerraFirma.kt. */
+    object TerraFirma : HandTheme(
+        name = "Terra Firma",
+        backgroundColor = Color(0xFF1E2350),
+        primaryColor = Color(0xFFFFD452),
+        secondaryColor = Color(0xFF3F45A0),
+        handColor = Color(0xFFE7A47A),
+        fingerColor = Color(0xFFE7A47A),
+        textColor = Color(0xFFF2F2F2),
+        cornerRadius = 4.dp,
+        isDark = true,
+        typeface = FontFamily.Monospace
+    )
+
     companion object {
         /**
          * Returns all available themes. We use a getter to ensure that the objects
@@ -82,9 +96,10 @@ sealed class HandTheme(
         val allThemes: List<HandTheme>
             get() = listOfNotNull(
                 Ombromanie,
+                PaperCutout,
+                TerraFirma,
                 Marginalia,
-                AnalogSynth,
-                PaperCutout
+                AnalogSynth
             )
 
         /** The theme new players start with. */

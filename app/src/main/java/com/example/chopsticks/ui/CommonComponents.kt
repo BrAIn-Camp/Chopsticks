@@ -29,6 +29,7 @@ import androidx.compose.ui.text.style.TextAlign
 import com.example.chopsticks.ui.theme.HandTheme
 import com.example.chopsticks.ui.theme.PaperPillButton
 import com.example.chopsticks.ui.theme.RubricButton
+import com.example.chopsticks.ui.theme.TerraPanelButton
 import com.example.chopsticks.ui.theme.ShadowTicketButton
 import kotlinx.coroutines.delay
 import kotlin.random.Random
@@ -216,6 +217,8 @@ fun ArtisticActionButton(
         ShadowTicketButton(text, onClick, modifier, enabled, buttonAlpha)
     } else if (theme is HandTheme.Marginalia) {
         RubricButton(text, onClick, modifier, enabled, buttonAlpha)
+    } else if (theme is HandTheme.TerraFirma) {
+        TerraPanelButton(text, onClick, modifier, enabled, buttonAlpha)
     } else {
         PaperPillButton(text, onClick, modifier, enabled, buttonAlpha)
     }

@@ -16,6 +16,7 @@ import androidx.compose.ui.text.*
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.chopsticks.ui.theme.*
 import kotlin.math.PI
 import kotlin.math.cos
@@ -34,6 +35,13 @@ fun ThemedHand(
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "hand_animations")
     val textMeasurer = rememberTextMeasurer()
+    val pixelBuffer = remember { PixelBuffer() }
+    // Terra Firma: the selected inventory slot pops up slightly, as the selected hotbar slot does
+    val slotScale by animateFloatAsState(
+        targetValue = if (theme is HandTheme.TerraFirma && isActive) 1.05f else 1f,
+        animationSpec = tween(250),
+        label = "slot_scale"
+    )
 
     val pulse by infiniteTransition.animateFloat(
         initialValue = 0f,
@@ -46,8 +54,8 @@ fun ThemedHand(
     )
 
     val activeAlpha by animateFloatAsState(
-        // Paper sprites barely dim: the spotlights already show whose turn it is
-        targetValue = if (isActive) 1f else if (theme is HandTheme.PaperCutout) 0.82f else 0.4f,
+        // Paper sprites and inventory slots barely dim: spotlights / slot highlights show whose turn it is
+        targetValue = if (isActive) 1f else if (theme is HandTheme.PaperCutout || theme is HandTheme.TerraFirma) 0.82f else 0.4f,
         animationSpec = tween(500),
         label = "active_alpha"
     )
@@ -79,6 +87,10 @@ fun ThemedHand(
             .graphicsLayer {
                 translationX = shakeX
                 alpha = activeAlpha
+                if (theme is HandTheme.TerraFirma) {
+                    scaleX = slotScale
+                    scaleY = slotScale
+                }
                 if (theme is HandTheme.PaperCutout) {
                     scaleX = cos(flip.value * 2f * PI.toFloat())
                     translationY = -sin(flip.value * PI.toFloat()) * 14.dp.toPx()
@@ -89,6 +101,14 @@ fun ThemedHand(
                     val w = size.width
                     val h = size.height
                     val jitter = if (theme.organicEdges) 4f else 0f
+
+                    if (isDead && theme is HandTheme.TerraFirma) {
+                        drawPixelated(pixelBuffer, terraPixel()) {
+                            drawTerraSlot(selected = isActive)
+                            drawTombstone(width / 2f, height * 0.8f)
+                        }
+                        return@onDrawWithContent
+                    }
 
                     if (isDead && theme is HandTheme.PaperCutout) {
                         drawCrumpledPaper(Offset(w / 2, h * 0.7f), w * 0.2f)
@@ -177,6 +197,8 @@ fun ThemedHand(
                         }
                         // Drawn as a whole glove once the fingers are laid out, below
                         is HandTheme.PaperCutout -> Unit
+                        // Drawn as pixel art inside its slot once the fingers are laid out, below
+                        is HandTheme.TerraFirma -> Unit
                         is HandTheme.Ombromanie -> drawShadowPalm(palmRect, isLeftHand, bottom = h)
                         is HandTheme.Marginalia -> drawManuscriptHand(palmRect, isLeftHand, bottom = h, fingers = fingers, textMeasurer = textMeasurer)
                     }
@@ -263,6 +285,18 @@ fun ThemedHand(
                                 (indexPosition - i).coerceAtLeast(0)
                             }
                         }
+                    }
+
+                    if (theme is HandTheme.TerraFirma) {
+                        // The hand sits inside its slot, a little smaller than the slot itself
+                        val inset = android.graphics.Matrix().apply { setScale(0.8f, 0.8f, w / 2f, h * 0.46f) }
+                        drawPixelated(pixelBuffer, terraPixel(), inset) {
+                            drawTerraSlot(selected = isActive)
+                            drawTerraHand(palmRect, isLeftHand, h, fingerBases, fingerAngles, fingerLengths, fingerWidths, activeIndices)
+                        }
+                        // The finger count as the item's stack count, bottom-left of the slot
+                        drawTerraText(textMeasurer, fingers.toString(), Offset(9.dp.toPx(), h - 32.dp.toPx()), Color.White, 20.sp)
+                        return@onDrawWithContent
                     }
 
                     if (theme is HandTheme.PaperCutout) {
@@ -418,6 +452,7 @@ private fun DrawScope.drawAnatomicalFinger(
                 }
                 // The glove is drawn whole by drawPaperGlove, never segment by segment
                 is HandTheme.PaperCutout -> Unit
+                is HandTheme.TerraFirma -> Unit
                 // A silhouette has no inner detail: the shape is everything
                 is HandTheme.Ombromanie -> {
                     drawPath(finalPath, theme.fingerColor)

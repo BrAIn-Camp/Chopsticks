@@ -252,6 +252,7 @@ fun ChopsticksBackground(
 
             is HandTheme.Ombromanie -> drawShadowChopsticks(scale)
             is HandTheme.Marginalia -> drawManuscriptChopsticks(scale)
+            is HandTheme.TerraFirma -> drawTerraChopsticks(scale)
         }
     }
 }

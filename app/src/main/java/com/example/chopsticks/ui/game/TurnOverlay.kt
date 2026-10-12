@@ -26,6 +26,8 @@ import androidx.compose.ui.unit.sp
 import com.example.chopsticks.domain.model.GameMode
 import com.example.chopsticks.ui.theme.*
 import kotlin.math.PI
+import kotlinx.coroutines.delay
+import androidx.compose.ui.Alignment
 import kotlin.math.sin
 import kotlin.random.Random
 
@@ -67,6 +69,8 @@ fun ThemeTurnOverlay(
 
     val flicker = if (theme is HandTheme.Ombromanie) rememberCandleFlicker() else null
     val sway = if (theme is HandTheme.PaperCutout) rememberPaperSway() else null
+    val terraTime = if (theme is HandTheme.TerraFirma) rememberTerraTime() else null
+    val terraBuffer = remember { PixelBuffer() }
 
     Canvas(modifier = Modifier.fillMaxSize()) {
         when (theme) {
@@ -88,6 +92,13 @@ fun ThemeTurnOverlay(
                 drawLampLitScreen(lamp, f)
                 drawSideCurtains(f)
             }
+            is HandTheme.TerraFirma -> {
+                // Day on Player 1's turn, night on Player 2's: the sky turns as the turn changes
+                val day = p1Progress / (p1Progress + p2Progress).coerceAtLeast(0.001f)
+                drawPixelated(terraBuffer, terraPixel()) {
+                    drawTerraWorld(day = day, time = terraTime?.value ?: 0f, horizon = 0.5f)
+                }
+            }
             is HandTheme.Marginalia -> {
                 drawManuscriptPage()
                 drawIvyBorder(10.dp.toPx(), 0f, size.height)
@@ -104,6 +115,9 @@ fun ThemeTurnOverlay(
     
     // Active Stamp / Status Overlay
     Box(modifier = Modifier.fillMaxSize()) {
+        if (theme is HandTheme.TerraFirma) {
+            TerraTurnMessage(currentPlayerId, gameMode)
+        }
         if (gameMode == GameMode.PvE && currentPlayerId == "Player 2") {
             ComputerThinkingStatus(p2Area, theme)
         }
@@ -218,6 +232,19 @@ private fun DrawScope.drawEnergyCable(rect: Rect, progress: Float, color: Color,
 private fun ComputerThinkingStatus(p2Area: Rect?, theme: HandTheme) {
     if (p2Area == null) return
 
+    if (theme is HandTheme.TerraFirma) {
+        TerraText(
+            "The Computer is plotting…",
+            TerraInk.BossPurple,
+            fontSize = 13.sp,
+            modifier = Modifier.graphicsLayer {
+                translationX = p2Area.center.x - 110.dp.toPx()
+                translationY = p2Area.bottom + 2.dp.toPx()
+            }
+        )
+        return
+    }
+
     if (theme is HandTheme.PaperCutout) {
         // A speech bubble just below the computer's hands, tail pointing up at them
         PaperSpeechBubble(
@@ -275,5 +302,29 @@ private fun ComputerThinkingStatus(p2Area: Rect?, theme: HandTheme) {
                 fontFamily = FontFamily.Monospace
             )
         }
+    }
+}
+
+/**
+ * Announces each turn the way the game announces events, fading in and out: nightfall brings
+ * "The Computer has awoken!" in boss purple, daybreak hands the move back in event green.
+ */
+@Composable
+private fun TerraTurnMessage(currentPlayerId: String, gameMode: GameMode) {
+    val alpha = remember { Animatable(0f) }
+    LaunchedEffect(currentPlayerId) {
+        alpha.snapTo(0f)
+        alpha.animateTo(1f, tween(250))
+        delay(1800)
+        alpha.animateTo(0f, tween(700))
+    }
+    val (text, color) = when {
+        currentPlayerId == "Player 2" && gameMode == GameMode.PvE -> "The Computer has awoken!" to TerraInk.BossPurple
+        currentPlayerId == "Player 2" -> "Player 2 has awoken!" to TerraInk.BossPurple
+        gameMode == GameMode.PvE -> "The sun rises. Your move." to TerraInk.EventGreen
+        else -> "Player 1 has awoken!" to TerraInk.EventGreen
+    }
+    Box(Modifier.fillMaxSize().graphicsLayer { this.alpha = alpha.value }, contentAlignment = Alignment.Center) {
+        TerraText(text, color, fontSize = 18.sp)
     }
 }

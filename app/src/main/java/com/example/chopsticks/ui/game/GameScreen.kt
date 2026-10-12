@@ -409,7 +409,8 @@ fun GameScreen(
             lastMove = uiState.lastMove,
             lastMoveTimestamp = uiState.lastMoveTimestamp,
             handBounds = handBounds,
-            theme = theme
+            theme = theme,
+            label = moveAmountLabel(uiState)
         )
 
         // Arrow for the move being previewed from the hint analysis
