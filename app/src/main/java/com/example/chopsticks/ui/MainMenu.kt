@@ -123,15 +123,7 @@ fun MainMenu(
 
             // Theme Selection
             SectionHeader("VISUAL THEME", safeTheme)
-            LazyRow(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                contentPadding = PaddingValues(vertical = 8.dp)
-            ) {
-                items(HandTheme.allThemes) { theme ->
-                    ThemeCard(theme, safeTheme == theme, safeTheme) { onThemeChange(theme) }
-                }
-            }
+            ThemeCarousel(selected = safeTheme, onThemeChange = onThemeChange)
 
             Spacer(modifier = Modifier.height(48.dp))
 

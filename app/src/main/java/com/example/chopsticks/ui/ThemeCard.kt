@@ -1,6 +1,18 @@
 package com.example.chopsticks.ui
 
+import android.provider.Settings
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.interaction.DragInteraction
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -155,5 +167,59 @@ private fun ThemeNameplate(theme: HandTheme) {
             fontStyle = if (theme is HandTheme.Ombromanie) FontStyle.Italic else FontStyle.Normal,
             letterSpacing = if (theme is HandTheme.NeonRain) 1.5.sp else 0.sp
         )
+    }
+}
+
+/**
+ * The carousel is one endless row: the themes repeat end to end, so the first theme follows the
+ * last. The list is as long as a list can be and starts in its middle, so it never runs out either way.
+ */
+private const val CAROUSEL_LENGTH = Int.MAX_VALUE
+
+/**
+ * The theme picker as a carousel that drifts slowly on its own, looping through every theme,
+ * until the player drags it or taps a card; after that it stays where they left it. It never
+ * drifts when the system's "remove animations" accessibility setting is on.
+ */
+@Composable
+fun ThemeCarousel(selected: HandTheme, onThemeChange: (HandTheme) -> Unit) {
+    val themes = HandTheme.allThemes
+    val context = LocalContext.current
+    val animationsOff = remember {
+        Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
+    }
+    // Start in the middle of the endless row, on the selected theme
+    val middle = (CAROUSEL_LENGTH / 2).let { it - it % themes.size }
+    val listState = rememberLazyListState(initialFirstVisibleItemIndex = middle + themes.indexOf(selected).coerceAtLeast(0))
+    var drifting by rememberSaveable { mutableStateOf(!animationsOff) }
+    val speed = with(LocalDensity.current) { 26.dp.toPx() } // per second: slow enough to read each card
+
+    // Any drag by the player stops the drift for good
+    LaunchedEffect(listState) {
+        listState.interactionSource.interactions.collect { if (it is DragInteraction.Start) drifting = false }
+    }
+    LaunchedEffect(drifting) {
+        if (!drifting) return@LaunchedEffect
+        var last = withFrameNanos { it }
+        while (true) {
+            val now = withFrameNanos { it }
+            listState.scrollBy(speed * (now - last) / 1_000_000_000f)
+            last = now
+        }
+    }
+
+    LazyRow(
+        state = listState,
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = PaddingValues(vertical = 8.dp)
+    ) {
+        items(CAROUSEL_LENGTH) { index ->
+            val theme = themes[index % themes.size]
+            ThemeCard(theme, selected == theme, selected) {
+                drifting = false
+                onThemeChange(theme)
+            }
+        }
     }
 }
