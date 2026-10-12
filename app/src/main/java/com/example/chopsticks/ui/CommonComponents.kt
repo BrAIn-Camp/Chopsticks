@@ -74,38 +74,6 @@ fun RowScope.ModeButton(text: String, selected: Boolean, theme: HandTheme, onCli
 }
 
 @Composable
-fun ThemeCard(theme: HandTheme, selected: Boolean, currentTheme: HandTheme, onClick: () -> Unit) {
-    Column(
-        modifier = Modifier
-            .width(100.dp)
-            .clip(RoundedCornerShape(currentTheme.cornerRadius))
-            .background(theme.backgroundColor)
-            .border(
-                width = if (selected) 2.dp else 1.dp,
-                color = if (selected) currentTheme.primaryColor else currentTheme.secondaryColor.copy(alpha = 0.3f),
-                shape = RoundedCornerShape(currentTheme.cornerRadius)
-            )
-            .clickable { onClick() }
-            .padding(8.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Box(
-            modifier = Modifier
-                .size(40.dp)
-                .background(theme.primaryColor, shape = RoundedCornerShape(theme.cornerRadius))
-        )
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = theme.name,
-            color = theme.textColor,
-            fontSize = 10.sp,
-            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center
-        )
-    }
-}
-
-@Composable
 fun RuleToggle(
     label: String,
     checked: Boolean,

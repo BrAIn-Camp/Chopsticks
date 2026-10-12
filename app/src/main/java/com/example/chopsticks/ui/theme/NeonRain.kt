@@ -82,7 +82,7 @@ private fun neonLit(time: Float, seed: Int): Boolean {
  * The megacity at night: dead-channel static sky, three layers of towers with lit windows and
  * aircraft lights, a buzzing 箸 sign, a passing spinner, wet street reflections, and rain.
  */
-fun DrawScope.drawNeonCity(time: Float, textMeasurer: TextMeasurer) {
+fun DrawScope.drawNeonCity(time: Float, textMeasurer: TextMeasurer, showSign: Boolean = true) {
     val w = size.width
     val h = size.height
 
@@ -135,17 +135,22 @@ fun DrawScope.drawNeonCity(time: Float, textMeasurer: TextMeasurer) {
     towers(23, NeonInk.TowerMid, 0.22f, 0.45f, 0.45f, beacons = true, windowOdds = 14)
 
     // The 箸 sign, a vertical neon tube on a bracket, buzzing
+    // (left out of small previews, where it would crowd everything else)
     val signRect = Rect(Offset(w * 0.74f, h * 0.36f), Size(54.dp.toPx(), 86.dp.toPx()))
-    drawRect(Color(0xFF0B0C12), signRect.topLeft, signRect.size)
-    drawRect(NeonInk.Red.copy(alpha = 0.5f), signRect.topLeft, signRect.size, style = Stroke(1.5.dp.toPx()))
-    val lit = neonLit(time, 5)
+    if (showSign) {
+        drawRect(Color(0xFF0B0C12), signRect.topLeft, signRect.size)
+        drawRect(NeonInk.Red.copy(alpha = 0.5f), signRect.topLeft, signRect.size, style = Stroke(1.5.dp.toPx()))
+    }
+    val lit = showSign && neonLit(time, 5)
     val glyphStyle = TextStyle(
         fontSize = 46.sp,
         color = if (lit) Color(0xFFFFD6D6) else Color(0xFF3A1214),
         shadow = if (lit) Shadow(NeonInk.RedGlow, Offset.Zero, 28f) else null
     )
-    val glyph = textMeasurer.measure("箸", glyphStyle)
-    drawText(glyph, topLeft = signRect.center - Offset(glyph.size.width / 2f, glyph.size.height / 2f))
+    if (showSign) {
+        val glyph = textMeasurer.measure("箸", glyphStyle)
+        drawText(glyph, topLeft = signRect.center - Offset(glyph.size.width / 2f, glyph.size.height / 2f))
+    }
     // The tube's light spilling onto the haze around it
     if (lit) drawCircle(Brush.radialGradient(listOf(NeonInk.Red.copy(alpha = 0.22f), Color.Transparent), center = signRect.center, radius = signRect.height * 1.1f), signRect.height * 1.1f, signRect.center)
 
