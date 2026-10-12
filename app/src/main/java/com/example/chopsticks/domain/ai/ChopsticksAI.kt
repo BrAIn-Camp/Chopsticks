@@ -330,7 +330,7 @@ object ChopsticksAI {
 
     internal fun evaluate(state: GameState, originalPlayerId: String): Int {
         val currentPlayer = if (state.player1.id == originalPlayerId) state.player1 else state.player2
-        val opponent = if (state.player2.id == originalPlayerId) state.player2 else state.player1
+        val opponent = if (state.player1.id == originalPlayerId) state.player2 else state.player1
         
         var score = 0
         val maxFingers = state.ruleset.maxFingers

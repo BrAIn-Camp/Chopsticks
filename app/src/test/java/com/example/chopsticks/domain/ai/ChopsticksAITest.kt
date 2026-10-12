@@ -73,6 +73,34 @@ class ChopsticksAITest {
     }
 
     @Test
+    fun `evaluation rewards killing an opponent hand for either player`() {
+        val even = GameState(
+            player1 = Player("Player 1", leftHand = Hand(1), rightHand = Hand(1)),
+            player2 = Player("Player 2", leftHand = Hand(1), rightHand = Hand(1))
+        )
+        val p2LostAHand = even.copy(player2 = Player("Player 2", leftHand = Hand(0), rightHand = Hand(1)))
+        val p1LostAHand = even.copy(player1 = Player("Player 1", leftHand = Hand(0), rightHand = Hand(1)))
+
+        assertTrue(ChopsticksAI.evaluate(p2LostAHand, "Player 1") > ChopsticksAI.evaluate(even, "Player 1"))
+        assertTrue(ChopsticksAI.evaluate(p1LostAHand, "Player 2") > ChopsticksAI.evaluate(even, "Player 2"))
+    }
+
+    @Test
+    fun `easy AI takes a free hand kill`() = runBlocking {
+        // AI's 2 + opponent's 3 kills the opponent's right hand; nothing else changes much.
+        val state = GameState(
+            player1 = Player("Player 1", leftHand = Hand(1), rightHand = Hand(3)),
+            player2 = Player("Player 2", leftHand = Hand(2), rightHand = Hand(1)),
+            currentPlayerId = "Player 2",
+            ruleset = RulesetConfig(overflow = false)
+        )
+        repeat(10) {
+            val move = ChopsticksAI.chooseMove(state, Difficulty.EASY)
+            assertEquals(Move.Attack("Player 2", fromHandIndex = 0, toHandIndex = 1), move)
+        }
+    }
+
+    @Test
     fun `AI returns null when no moves possible`() = runBlocking {
         val state = GameState(winnerId = "Player 1")
         val move = ChopsticksAI.chooseMove(state, Difficulty.EASY)
