@@ -7,7 +7,6 @@ import com.example.chopsticks.domain.model.Hand
 import com.example.chopsticks.domain.model.Player
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.util.concurrent.ConcurrentHashMap
 
 enum class HintCategory {
     OFFENSIVE, DEFENSIVE, SETUP, VICTORY
@@ -24,44 +23,25 @@ object ChopsticksAI {
 
     private const val WIN_SCORE = 1000000
     private const val DRAW_SCORE = 0
-    private val memo = ConcurrentHashMap<Pair<GameState, Int>, Int>()
 
     suspend fun chooseMove(state: GameState, difficulty: Difficulty): Move? = withContext(Dispatchers.Default) {
-        memo.clear()
-        val possibleMoves = getPossibleMoves(state).filter { RulesEngine.validateMove(state, it) }
+        val possibleMoves = getPossibleMoves(state)
         if (possibleMoves.isEmpty()) return@withContext null
 
         when (difficulty) {
             Difficulty.NOVICE -> possibleMoves.random()
-            Difficulty.EASY -> getBestMoveMinimax(state, possibleMoves, depth = 1)
-            Difficulty.MEDIUM -> getBestMoveMinimax(state, possibleMoves, depth = 2)
-            Difficulty.HARD -> getBestMoveMinimax(state, possibleMoves, depth = 4)
-            Difficulty.PERFECT -> getBestMoveMinimax(state, possibleMoves, depth = 12)
+            Difficulty.EASY -> getBestMoveMinimax(state, depth = 1)
+            Difficulty.MEDIUM -> getBestMoveMinimax(state, depth = 2)
+            Difficulty.HARD -> getBestMoveMinimax(state, depth = 4)
+            Difficulty.PERFECT -> getBestMoveMinimax(state, depth = 12)
         }
     }
 
     suspend fun getHint(state: GameState): HintResult? = withContext(Dispatchers.Default) {
-        memo.clear()
-        val possibleMoves = getPossibleMoves(state).filter { RulesEngine.validateMove(state, it) }
-        if (possibleMoves.isEmpty()) return@withContext null
-
         val depth = 12
         val currentPlayerId = state.currentPlayerId
-        var bestScore = Int.MIN_VALUE
-        var bestMove: Move? = null
+        val (move, bestScore) = scoreMoves(state, depth).maxByOrNull { it.second } ?: return@withContext null
 
-        for (move in possibleMoves) {
-            val nextState = applyMove(state, move)
-            val score = minimax(nextState, depth - 1, Int.MIN_VALUE, Int.MAX_VALUE, false, currentPlayerId)
-
-            if (score > bestScore) {
-                bestScore = score
-                bestMove = move
-            }
-        }
-
-        val move = bestMove ?: return@withContext null
-        
         val nextState = applyMove(state, move)
         val opponentId = state.getOpponentPlayer().id
 
@@ -261,76 +241,94 @@ object ChopsticksAI {
         return 0 // Fallback
     }
 
-    private fun getBestMoveMinimax(state: GameState, possibleMoves: List<Move>, depth: Int): Move {
-        val currentPlayerId = state.currentPlayerId
-        var bestScore = Int.MIN_VALUE
-        var bestMoves = mutableListOf<Move>()
-
-        for (move in possibleMoves) {
-            val nextState = applyMove(state, move)
-            val score = minimax(nextState, depth - 1, Int.MIN_VALUE, Int.MAX_VALUE, false, currentPlayerId)
-            
-            if (score > bestScore) {
-                bestScore = score
-                bestMoves = mutableListOf(move)
-            } else if (score == bestScore) {
-                bestMoves.add(move)
-            }
-        }
-
-        return bestMoves.random()
-    }
-
-    private fun minimax(
-        state: GameState,
-        depth: Int,
-        alpha: Int,
-        beta: Int,
-        maximizingPlayer: Boolean,
-        originalPlayerId: String
-    ): Int {
-        // Victory check
-        if (state.winnerId != null) {
-            return if (state.winnerId == originalPlayerId) WIN_SCORE + depth else -WIN_SCORE - depth
-        }
-        
-        if (depth == 0) {
-            return evaluate(state, originalPlayerId)
-        }
-
-        val stateKey = state to depth
-        if (memo.containsKey(stateKey)) return memo[stateKey]!!
-
-        val moves = getPossibleMoves(state)
-        if (moves.isEmpty()) return DRAW_SCORE
-
-        var currentAlpha = alpha
-        var currentBeta = beta
-
-        if (maximizingPlayer) {
-            var maxEval = Int.MIN_VALUE
-            for (move in moves) {
-                val eval = minimax(applyMove(state, move), depth - 1, currentAlpha, currentBeta, false, originalPlayerId)
-                maxEval = maxOf(maxEval, eval)
-                currentAlpha = maxOf(currentAlpha, eval)
-                if (currentBeta <= currentAlpha) break
-            }
-            memo[stateKey] = maxEval
-            return maxEval
-        } else {
-            var minEval = Int.MAX_VALUE
-            for (move in moves) {
-                val eval = minimax(applyMove(state, move), depth - 1, currentAlpha, currentBeta, true, originalPlayerId)
-                minEval = minOf(minEval, eval)
-                currentBeta = minOf(currentBeta, eval)
-                if (currentBeta <= currentAlpha) break
-            }
-            memo[stateKey] = minEval
-            return minEval
+    /**
+     * Scores every legal move for the current player by searching [depth] plies ahead.
+     * Higher is better for the player to move.
+     */
+    internal fun scoreMoves(state: GameState, depth: Int): List<Pair<Move, Int>> {
+        val search = Search(state.currentPlayerId)
+        return getPossibleMoves(state).map { move ->
+            move to search.minimax(applyMove(state, move), depth - 1, Int.MIN_VALUE, Int.MAX_VALUE, false)
         }
     }
 
-    private fun evaluate(state: GameState, originalPlayerId: String): Int {
+    private fun getBestMoveMinimax(state: GameState, depth: Int): Move {
+        val scored = scoreMoves(state, depth)
+        val bestScore = scored.maxOf { it.second }
+        return scored.filter { it.second == bestScore }.random().first
+    }
+
+    /** Hand counts and whose turn it is: everything that affects the search from a position. */
+    private data class PositionKey(
+        val p1Left: Int, val p1Right: Int,
+        val p2Left: Int, val p2Right: Int,
+        val currentPlayerId: String,
+        val depth: Int
+    )
+
+    /**
+     * Whether a remembered score is exact, or only a limit because the search was cut short
+     * once it knew the result was too good or too bad to matter.
+     */
+    private enum class Bound { EXACT, AT_LEAST, AT_MOST }
+
+    private class TableEntry(val score: Int, val bound: Bound)
+
+    /** One search from one player's point of view, with its own memo table. */
+    private class Search(private val originalPlayerId: String) {
+        private val table = HashMap<PositionKey, TableEntry>()
+
+        fun minimax(state: GameState, depth: Int, alpha: Int, beta: Int, maximizingPlayer: Boolean): Int {
+            state.winnerId?.let { winner ->
+                return if (winner == originalPlayerId) WIN_SCORE + depth else -WIN_SCORE - depth
+            }
+            if (depth == 0) return evaluate(state, originalPlayerId)
+
+            val key = PositionKey(
+                state.player1.leftHand.fingers, state.player1.rightHand.fingers,
+                state.player2.leftHand.fingers, state.player2.rightHand.fingers,
+                state.currentPlayerId, depth
+            )
+            var currentAlpha = alpha
+            var currentBeta = beta
+            table[key]?.let { entry ->
+                when (entry.bound) {
+                    Bound.EXACT -> return entry.score
+                    Bound.AT_LEAST -> currentAlpha = maxOf(currentAlpha, entry.score)
+                    Bound.AT_MOST -> currentBeta = minOf(currentBeta, entry.score)
+                }
+                if (currentAlpha >= currentBeta) return entry.score
+            }
+
+            val moves = getPossibleMoves(state)
+            if (moves.isEmpty()) return DRAW_SCORE
+
+            val windowAlpha = currentAlpha
+            val windowBeta = currentBeta
+            var best = if (maximizingPlayer) Int.MIN_VALUE else Int.MAX_VALUE
+            for (move in moves) {
+                val eval = minimax(applyMove(state, move), depth - 1, currentAlpha, currentBeta, !maximizingPlayer)
+                if (maximizingPlayer) {
+                    best = maxOf(best, eval)
+                    currentAlpha = maxOf(currentAlpha, eval)
+                } else {
+                    best = minOf(best, eval)
+                    currentBeta = minOf(currentBeta, eval)
+                }
+                if (currentBeta <= currentAlpha) break
+            }
+
+            val bound = when {
+                best <= windowAlpha -> Bound.AT_MOST
+                best >= windowBeta -> Bound.AT_LEAST
+                else -> Bound.EXACT
+            }
+            table[key] = TableEntry(best, bound)
+            return best
+        }
+    }
+
+    internal fun evaluate(state: GameState, originalPlayerId: String): Int {
         val currentPlayer = if (state.player1.id == originalPlayerId) state.player1 else state.player2
         val opponent = if (state.player2.id == originalPlayerId) state.player2 else state.player1
         
@@ -424,7 +422,7 @@ object ChopsticksAI {
         return moves
     }
 
-    private fun applyMove(state: GameState, move: Move): GameState {
+    internal fun applyMove(state: GameState, move: Move): GameState {
         return when (move) {
             is Move.Attack -> RulesEngine.attack(state, move.fromHandIndex, move.toHandIndex)
             is Move.Transfer -> RulesEngine.transfer(state, move.fromHandIndex, move.toHandIndex, move.amount)
