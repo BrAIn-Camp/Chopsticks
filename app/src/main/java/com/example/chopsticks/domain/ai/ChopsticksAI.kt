@@ -5,6 +5,7 @@ import com.example.chopsticks.domain.model.Difficulty
 import com.example.chopsticks.domain.model.GameState
 import com.example.chopsticks.domain.model.Hand
 import com.example.chopsticks.domain.model.Player
+import com.example.chopsticks.domain.model.Position
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -258,14 +259,6 @@ object ChopsticksAI {
         return scored.filter { it.second == bestScore }.random().first
     }
 
-    /** Hand counts and whose turn it is: everything that affects the search from a position. */
-    private data class PositionKey(
-        val p1Left: Int, val p1Right: Int,
-        val p2Left: Int, val p2Right: Int,
-        val currentPlayerId: String,
-        val depth: Int
-    )
-
     /**
      * Whether a remembered score is exact, or only a limit because the search was cut short
      * once it knew the result was too good or too bad to matter.
@@ -276,7 +269,7 @@ object ChopsticksAI {
 
     /** One search from one player's point of view, with its own memo table. */
     private class Search(private val originalPlayerId: String) {
-        private val table = HashMap<PositionKey, TableEntry>()
+        private val table = HashMap<Pair<Position, Int>, TableEntry>()
 
         fun minimax(state: GameState, depth: Int, alpha: Int, beta: Int, maximizingPlayer: Boolean): Int {
             state.winnerId?.let { winner ->
@@ -284,11 +277,7 @@ object ChopsticksAI {
             }
             if (depth == 0) return evaluate(state, originalPlayerId)
 
-            val key = PositionKey(
-                state.player1.leftHand.fingers, state.player1.rightHand.fingers,
-                state.player2.leftHand.fingers, state.player2.rightHand.fingers,
-                state.currentPlayerId, depth
-            )
+            val key = state.position to depth
             var currentAlpha = alpha
             var currentBeta = beta
             table[key]?.let { entry ->
@@ -366,70 +355,9 @@ object ChopsticksAI {
         }
     }
 
-    fun getPossibleMoves(state: GameState): List<Move> {
-        val moves = mutableListOf<Move>()
-        val playerId = state.currentPlayerId
+    fun getPossibleMoves(state: GameState): List<Move> = RulesEngine.legalMoves(state)
 
-        // Attacks
-        for (from in 0..1) {
-            for (to in 0..1) {
-                val move = Move.Attack(playerId, from, to)
-                if (RulesEngine.validateMove(state, move)) {
-                    moves.add(move)
-                }
-            }
-        }
-
-        // Transfers
-        val currentPlayer = state.getCurrentPlayer()
-        for (from in 0..1) {
-            val fromHand = if (from == 0) currentPlayer.leftHand else currentPlayer.rightHand
-            for (to in 0..1) {
-                if (from == to) continue
-                for (amount in 1..fromHand.fingers) {
-                    val move = Move.Transfer(playerId, from, to, amount)
-                    if (RulesEngine.validateMove(state, move)) {
-                        moves.add(move)
-                    }
-                }
-            }
-        }
-
-        // Exchange Life
-        for (sacrificed in 0..1) {
-            val move = Move.ExchangeLife(playerId, sacrificed)
-            if (RulesEngine.validateMove(state, move)) {
-                moves.add(move)
-            }
-        }
-
-        // Condense
-        if (state.ruleset.allowCondense) {
-            val total = currentPlayer.leftHand.fingers + currentPlayer.rightHand.fingers
-            val maxFingers = state.ruleset.maxFingers
-            if (total > maxFingers) {
-                val remainder = total - maxFingers
-                for (left in 0..remainder) {
-                    val right = remainder - left
-                    val move = Move.Condense(playerId, left, right)
-                    if (RulesEngine.validateMove(state, move)) {
-                        moves.add(move)
-                    }
-                }
-            }
-        }
-
-        return moves
-    }
-
-    internal fun applyMove(state: GameState, move: Move): GameState {
-        return when (move) {
-            is Move.Attack -> RulesEngine.attack(state, move.fromHandIndex, move.toHandIndex)
-            is Move.Transfer -> RulesEngine.transfer(state, move.fromHandIndex, move.toHandIndex, move.amount)
-            is Move.ExchangeLife -> RulesEngine.exchangeLife(state, move.sacrificedHandIndex)
-            is Move.Condense -> RulesEngine.condense(state, move.leftFingers, move.rightFingers)
-        }
-    }
+    internal fun applyMove(state: GameState, move: Move): GameState = RulesEngine.applyMove(state, move)
 
     private fun GameState.getPlayer(id: String): Player = if (player1.id == id) player1 else player2
 }

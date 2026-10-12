@@ -10,6 +10,8 @@ import com.example.chopsticks.domain.model.GameState
 import com.example.chopsticks.domain.model.GameMode
 import com.example.chopsticks.domain.model.Difficulty
 import com.example.chopsticks.domain.model.Player
+import com.example.chopsticks.domain.model.Position
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -45,6 +47,13 @@ class GameViewModel(private val repository: SettingsRepository) : ViewModel() {
     private val aiPlayerId = "Player 2"
     private var isMovePending = false
 
+    /** The move animation and any AI reply that follows it. Cancelled when a new game starts. */
+    private var moveJob: Job? = null
+    private var hintJob: Job? = null
+
+    /** How many times each position has occurred this game, for draw by repetition. */
+    private val positionCounts = mutableMapOf<Position, Int>()
+
     fun updateRulesetConfig(config: RulesetConfig) {
         _rulesetConfig.value = config
         repository.saveRulesetConfig(config)
@@ -68,31 +77,42 @@ class GameViewModel(private val repository: SettingsRepository) : ViewModel() {
      * Initializes a new game session.
      */
     fun startGame(mode: GameMode, ruleset: RulesetConfig, difficulty: Difficulty = Difficulty.EASY) {
+        moveJob?.cancel()
+        clearHint()
         gameMode = mode
         aiDifficulty = difficulty
         isMovePending = false
-        _hintState.value = null
-        _uiState.value = GameState(
+        val state = GameState(
             player1 = Player("Player 1"),
             player2 = Player("Player 2"),
             currentPlayerId = "Player 1",
             ruleset = ruleset
         )
+        positionCounts.clear()
+        _uiState.value = recordPosition(state)
     }
 
     fun requestHint() {
-        if (isMovePending || _uiState.value.winnerId != null) return
         val currentState = _uiState.value
-        
-        viewModelScope.launch {
+        if (isMovePending || currentState.isGameOver || isAiTurn(currentState)) return
+        if (hintJob?.isActive == true) return
+
+        hintJob = viewModelScope.launch {
             _isHintLoading.value = true
-            val hint = ChopsticksAI.getHint(currentState)
-            _hintState.value = hint
-            _isHintLoading.value = false
+            try {
+                val hint = ChopsticksAI.getHint(currentState)
+                // Drop the hint if the board moved on while it was being worked out
+                if (_uiState.value.position == currentState.position && !_uiState.value.isGameOver) {
+                    _hintState.value = hint
+                }
+            } finally {
+                _isHintLoading.value = false
+            }
         }
     }
 
     fun clearHint() {
+        hintJob?.cancel()
         _hintState.value = null
     }
 
@@ -104,207 +124,85 @@ class GameViewModel(private val repository: SettingsRepository) : ViewModel() {
         startGame(gameMode, currentState.ruleset, aiDifficulty)
     }
 
-    /**
-     * Handles an attack move from the user.
-     */
-    fun performAttack(fromHandIndex: Int, toHandIndex: Int) {
-        if (isMovePending) return
-        clearHint()
-        val currentState = _uiState.value
-        if (currentState.winnerId != null) return
-        if (currentState.currentPlayerId == aiPlayerId && gameMode == GameMode.PvE) return
+    fun performAttack(fromHandIndex: Int, toHandIndex: Int) =
+        submitPlayerMove(Move.Attack(_uiState.value.currentPlayerId, fromHandIndex, toHandIndex))
 
-        val move = Move.Attack(currentState.currentPlayerId, fromHandIndex, toHandIndex)
+    fun performTransfer(fromHandIndex: Int, toHandIndex: Int, amount: Int) =
+        submitPlayerMove(Move.Transfer(_uiState.value.currentPlayerId, fromHandIndex, toHandIndex, amount))
+
+    /** Exchange Life (Logan Clause). */
+    fun performExchangeLife(sacrificedHandIndex: Int) =
+        submitPlayerMove(Move.ExchangeLife(_uiState.value.currentPlayerId, sacrificedHandIndex))
+
+    /** Condense (Meta rule). */
+    fun performCondense(leftFingers: Int, rightFingers: Int) =
+        submitPlayerMove(Move.Condense(_uiState.value.currentPlayerId, leftFingers, rightFingers))
+
+    private fun submitPlayerMove(move: Move) {
+        val currentState = _uiState.value
+        if (isMovePending || currentState.isGameOver || isAiTurn(currentState)) return
+        clearHint()
+
         if (!RulesEngine.validateMove(currentState, move)) {
-            triggerInvalidMoveFeedback(currentState.currentPlayerId, fromHandIndex)
+            when (move) {
+                is Move.Attack -> triggerInvalidMoveFeedback(move.playerId, move.fromHandIndex)
+                is Move.Transfer -> triggerInvalidMoveFeedback(move.playerId, move.fromHandIndex)
+                else -> {}
+            }
             _uiState.value = currentState.copy(errorMessage = "Move not allowed")
             return
         }
 
+        moveJob = viewModelScope.launch { playMove(currentState, move) }
+    }
+
+    /**
+     * Shows the move animation, applies the move, checks for a draw, then lets the AI reply if it's its turn.
+     */
+    private suspend fun playMove(state: GameState, move: Move) {
         isMovePending = true
         val timestamp = System.currentTimeMillis()
-        _uiState.value = currentState.copy(
+        _uiState.value = state.copy(
             lastMove = move,
             lastMoveTimestamp = timestamp,
             errorMessage = null,
             isMovePending = true
         )
 
-        viewModelScope.launch {
-            delay(850)
-            val newState = RulesEngine.attack(currentState, fromHandIndex, toHandIndex)
-            _uiState.value = newState.copy(
-                lastMove = move,
-                lastMoveTimestamp = timestamp,
-                isMovePending = false
-            )
-            isMovePending = false
-            checkAiTurn(_uiState.value)
-        }
-    }
+        delay(850)
 
-    /**
-     * Handles a finger transfer move from the user.
-     */
-    fun performTransfer(fromHandIndex: Int, toHandIndex: Int, amount: Int) {
-        if (isMovePending) return
-        clearHint()
-        val currentState = _uiState.value
-        if (currentState.winnerId != null) return
-        if (currentState.currentPlayerId == aiPlayerId && gameMode == GameMode.PvE) return
-
-        val move = Move.Transfer(currentState.currentPlayerId, fromHandIndex, toHandIndex, amount)
-        if (!RulesEngine.validateMove(currentState, move)) {
-            triggerInvalidMoveFeedback(currentState.currentPlayerId, fromHandIndex)
-            _uiState.value = currentState.copy(errorMessage = "Move not allowed")
-            return
-        }
-
-        isMovePending = true
-        val timestamp = System.currentTimeMillis()
-        _uiState.value = currentState.copy(
+        val newState = recordPosition(RulesEngine.applyMove(state, move))
+        _uiState.value = newState.copy(
             lastMove = move,
             lastMoveTimestamp = timestamp,
-            errorMessage = null,
-            isMovePending = true
-        )
-
-        viewModelScope.launch {
-            delay(850)
-            val newState = RulesEngine.transfer(currentState, fromHandIndex, toHandIndex, amount)
-            _uiState.value = newState.copy(
-                lastMove = move,
-                lastMoveTimestamp = timestamp,
-                isMovePending = false
-            )
             isMovePending = false
-            checkAiTurn(_uiState.value)
+        )
+        isMovePending = false
+
+        if (!newState.isGameOver && isAiTurn(newState)) {
+            delay(1000) // Small delay for UX to let user see the board
+            val aiState = _uiState.value
+            val aiMove = ChopsticksAI.chooseMove(aiState, aiDifficulty) ?: return
+            playMove(aiState, aiMove)
         }
     }
 
-    /**
-     * Handles an Exchange Life move (Logan Clause).
-     */
-    fun performExchangeLife(sacrificedHandIndex: Int) {
-        if (isMovePending) return
-        clearHint()
-        val currentState = _uiState.value
-        if (currentState.winnerId != null) return
-        if (currentState.currentPlayerId == aiPlayerId && gameMode == GameMode.PvE) return
-
-        val move = Move.ExchangeLife(currentState.currentPlayerId, sacrificedHandIndex)
-        if (!RulesEngine.validateMove(currentState, move)) {
-            _uiState.value = currentState.copy(errorMessage = "Move not allowed")
-            return
-        }
-
-        isMovePending = true
-        val timestamp = System.currentTimeMillis()
-        _uiState.value = currentState.copy(
-            lastMove = move,
-            lastMoveTimestamp = timestamp,
-            errorMessage = null,
-            isMovePending = true
-        )
-
-        viewModelScope.launch {
-            delay(850)
-            val newState = RulesEngine.exchangeLife(currentState, sacrificedHandIndex)
-            _uiState.value = newState.copy(
-                lastMove = move,
-                lastMoveTimestamp = timestamp,
-                isMovePending = false
-            )
-            isMovePending = false
-            checkAiTurn(_uiState.value)
-        }
+    /** Counts the new position and ends the game in a draw if it has repeated too often or is stuck. */
+    private fun recordPosition(state: GameState): GameState {
+        if (state.isGameOver) return state
+        val timesSeen = (positionCounts[state.position] ?: 0) + 1
+        positionCounts[state.position] = timesSeen
+        val drawReason = RulesEngine.detectDraw(state, timesSeen) ?: return state
+        return state.copy(drawReason = drawReason)
     }
 
-    /**
-     * Handles a Condense move (Meta rule).
-     */
-    fun performCondense(leftFingers: Int, rightFingers: Int) {
-        if (isMovePending) return
-        clearHint()
-        val currentState = _uiState.value
-        if (currentState.winnerId != null) return
-        if (currentState.currentPlayerId == aiPlayerId && gameMode == GameMode.PvE) return
-
-        val move = Move.Condense(currentState.currentPlayerId, leftFingers, rightFingers)
-        if (!RulesEngine.validateMove(currentState, move)) {
-            _uiState.value = currentState.copy(errorMessage = "Move not allowed")
-            return
-        }
-
-        isMovePending = true
-        val timestamp = System.currentTimeMillis()
-        _uiState.value = currentState.copy(
-            lastMove = move,
-            lastMoveTimestamp = timestamp,
-            errorMessage = null,
-            isMovePending = true
-        )
-
-        viewModelScope.launch {
-            delay(850)
-            val newState = RulesEngine.condense(currentState, leftFingers, rightFingers)
-            _uiState.value = newState.copy(
-                lastMove = move,
-                lastMoveTimestamp = timestamp,
-                isMovePending = false
-            )
-            isMovePending = false
-            checkAiTurn(_uiState.value)
-        }
-    }
+    private fun isAiTurn(state: GameState) = gameMode == GameMode.PvE && state.currentPlayerId == aiPlayerId
 
     private fun triggerInvalidMoveFeedback(playerId: String, handIndex: Int) {
         viewModelScope.launch {
             _invalidMoveHand.value = playerId to handIndex
             delay(500)
             _invalidMoveHand.value = null
-        }
-    }
-
-    private fun checkAiTurn(state: GameState) {
-        if (state.winnerId == null && gameMode == GameMode.PvE && state.currentPlayerId == aiPlayerId) {
-            triggerAiMove()
-        }
-    }
-
-    private fun triggerAiMove() {
-        viewModelScope.launch {
-            delay(1000) // Small delay for UX to let user see the board
-            val currentState = _uiState.value
-            val move = ChopsticksAI.chooseMove(currentState, aiDifficulty)
-            
-            move?.let {
-                if (!RulesEngine.validateMove(currentState, it)) return@let
-                
-                isMovePending = true
-                val timestamp = System.currentTimeMillis()
-                _uiState.value = currentState.copy(
-                    lastMove = it,
-                    lastMoveTimestamp = timestamp,
-                    errorMessage = null,
-                    isMovePending = true
-                )
-                
-                delay(850)
-                
-                val newState = when (it) {
-                    is Move.Attack -> RulesEngine.attack(currentState, it.fromHandIndex, it.toHandIndex)
-                    is Move.Transfer -> RulesEngine.transfer(currentState, it.fromHandIndex, it.toHandIndex, it.amount)
-                    is Move.ExchangeLife -> RulesEngine.exchangeLife(currentState, it.sacrificedHandIndex)
-                    is Move.Condense -> RulesEngine.condense(currentState, it.leftFingers, it.rightFingers)
-                }
-                _uiState.value = newState.copy(
-                    lastMove = it,
-                    lastMoveTimestamp = timestamp,
-                    isMovePending = false
-                )
-                isMovePending = false
-            }
         }
     }
 }

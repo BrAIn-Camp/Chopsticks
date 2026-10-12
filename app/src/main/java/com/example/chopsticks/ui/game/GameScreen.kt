@@ -40,6 +40,7 @@ import com.example.chopsticks.domain.ai.HintCategory
 import com.example.chopsticks.domain.ai.HintResult
 import com.example.chopsticks.domain.ai.Move
 import com.example.chopsticks.domain.engine.RulesEngine
+import com.example.chopsticks.domain.model.DrawReason
 import com.example.chopsticks.domain.model.GameMode
 import com.example.chopsticks.domain.model.GameState
 import com.example.chopsticks.domain.model.RulesetConfig
@@ -86,8 +87,8 @@ fun GameScreen(
             .fillMaxSize()
             .background(theme.backgroundColor)
             .onGloballyPositioned { rootCoordinates = it }
-            .pointerInput(uiState.currentPlayerId, uiState.winnerId, uiState.isMovePending) {
-                if (uiState.winnerId != null || uiState.isMovePending) return@pointerInput
+            .pointerInput(uiState.currentPlayerId, uiState.isGameOver, uiState.isMovePending) {
+                if (uiState.isGameOver || uiState.isMovePending) return@pointerInput
                 
                 val currentPlayerId = uiState.currentPlayerId
                 val isAiTurn = (currentPlayerId == "Player 2") && (viewModel.gameMode.name == "PvE")
@@ -236,7 +237,7 @@ fun GameScreen(
                     .fillMaxWidth()
                     .padding(vertical = 16.dp)
                     .let {
-                        if (uiState.winnerId != null) {
+                        if (uiState.isGameOver) {
                             it.irregularBorder(
                                 color = theme.primaryColor.copy(alpha = 0.3f),
                                 strokeWidth = 2.dp,
@@ -246,9 +247,9 @@ fun GameScreen(
                         } else it
                     }
             ) {
-                if (uiState.winnerId != null) {
+                if (uiState.isGameOver) {
                     Text(
-                        text = "WINNER: ${uiState.winnerId}",
+                        text = resultText(uiState),
                         color = theme.textColor,
                         fontSize = 24.sp,
                         fontWeight = FontWeight.Black,
@@ -277,7 +278,7 @@ fun GameScreen(
             // PLAYER ACTIONS (Condense, Exchange)
             val isAiTurn = (uiState.currentPlayerId == "Player 2") && (viewModel.gameMode == GameMode.PvE)
             // Show action buttons whenever game is active, but disabled during AI turn or move pending
-            if (uiState.winnerId == null) {
+            if (!uiState.isGameOver) {
                 val currentPlayer = uiState.getCurrentPlayer()
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
@@ -381,7 +382,7 @@ fun GameScreen(
                     
                     val isAiTurn = (uiState.currentPlayerId == "Player 2") && (viewModel.gameMode == GameMode.PvE)
                     // HINT button remains visible throughout the game to ensure layout stability
-                    if (uiState.winnerId == null) {
+                    if (!uiState.isGameOver) {
                         Spacer(modifier = Modifier.height(24.dp))
                         ArtisticActionButton(
                             text = if (isHintLoading) "ANALYZING..." else "HINT",
@@ -508,9 +509,9 @@ fun GameScreen(
         }
 
         // Themed Game Over Overlay
-        if (uiState.winner != null) {
+        if (uiState.isGameOver) {
             GameOverOverlay(
-                winner = uiState.winner ?: "",
+                state = uiState,
                 theme = theme,
                 gameMode = viewModel.gameMode,
                 onRestart = { viewModel.restartGame() }
@@ -1702,13 +1703,21 @@ fun GameScreenThemesPreview() {
     }
 }
 
+/** One line describing how the game ended, e.g. "WINNER: Player 1" or "DRAW: SAME POSITION 3 TIMES". */
+fun resultText(state: GameState): String = when (state.drawReason) {
+    DrawReason.REPETITION -> "DRAW: SAME POSITION ${RulesEngine.REPETITION_LIMIT} TIMES"
+    DrawReason.NO_LEGAL_MOVES -> "DRAW: NO LEGAL MOVES"
+    null -> "WINNER: ${state.winnerId}"
+}
+
 @Composable
 fun GameOverOverlay(
-    winner: String,
+    state: GameState,
     theme: HandTheme,
     gameMode: GameMode,
     onRestart: () -> Unit
 ) {
+    val winner = state.winnerId
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -1729,7 +1738,11 @@ fun GameOverOverlay(
                 ),
                 label = "glitch_offset"
             )
-            val message = if (winner == "Player 1") "VICTORY ACHIEVED" else "SYSTEM SHUTDOWN"
+            val message = when (winner) {
+                null -> "SIGNAL DEADLOCK"
+                "Player 1" -> "VICTORY ACHIEVED"
+                else -> "SYSTEM SHUTDOWN"
+            }
 
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -1764,7 +1777,7 @@ fun GameOverOverlay(
                 Spacer(modifier = Modifier.height(8.dp))
                 
                 Text(
-                    text = "WINNER: $winner",
+                    text = resultText(state),
                     color = theme.textColor.copy(alpha = 0.8f),
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Medium,
@@ -1854,7 +1867,7 @@ fun GameOverOverlay(
                     Spacer(modifier = Modifier.height(8.dp))
                     
                     Text(
-                        text = "WINNER: $winner",
+                        text = resultText(state),
                         color = theme.textColor,
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
