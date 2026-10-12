@@ -1,6 +1,7 @@
 package com.example.chopsticks.ui.theme
 
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
@@ -16,8 +17,8 @@ sealed class HandTheme(
     val organicEdges: Boolean = false,
     val plasticTexture: Boolean = false,
     val isDark: Boolean = true,
-    /** Use a serif typeface for this theme's text instead of the default monospace. */
-    val serifType: Boolean = false
+    /** The typeface for this theme's text. */
+    val typeface: FontFamily = FontFamily.Monospace
 ) {
     object AnalogSynth : HandTheme(
         name = "Analog Synth",
@@ -31,17 +32,18 @@ sealed class HandTheme(
         plasticTexture = true
     )
 
+    /** Paper sprites on a cardboard stage. See PaperStage.kt. */
     object PaperCutout : HandTheme(
         name = "Paper Cutout",
-        backgroundColor = Color(0xFFE8E0D5),
-        primaryColor = Color(0xFF8B4513),
-        secondaryColor = Color(0xFFD2B48C),
-        handColor = Color(0xFF5D4037),
-        fingerColor = Color(0xFF795548),
-        textColor = Color(0xFF3E2723),
-        cornerRadius = 4.dp,
-        organicEdges = true,
-        isDark = false
+        backgroundColor = Color(0xFFF7F1E3),
+        primaryColor = Color(0xFFE2412F),
+        secondaryColor = Color(0xFFF6C443),
+        handColor = Color(0xFFFFFFFF),
+        fingerColor = Color(0xFFFFFFFF),
+        textColor = Color(0xFF2A2838),
+        cornerRadius = 16.dp,
+        isDark = false,
+        typeface = FontFamily.SansSerif
     )
 
     /** Hand shadows on a lamp-lit screen. See ShadowTheatre.kt. */
@@ -55,7 +57,7 @@ sealed class HandTheme(
         textColor = Color(0xFF22140F),
         cornerRadius = 0.dp,
         isDark = false,
-        serifType = true
+        typeface = FontFamily.Serif
     )
 
     /** A page of a medieval manuscript. See Manuscript.kt. */
@@ -69,7 +71,7 @@ sealed class HandTheme(
         textColor = Color(0xFF2B1C12),
         cornerRadius = 0.dp,
         isDark = false,
-        serifType = true
+        typeface = FontFamily.Serif
     )
 
     companion object {

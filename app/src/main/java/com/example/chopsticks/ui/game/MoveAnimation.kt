@@ -115,36 +115,7 @@ fun DrawScope.drawMovePath(
             drawCircle(color = theme.secondaryColor, radius = 18.dp.toPx(), center = pulsePos, style = Stroke(4.dp.toPx()))
             drawCircle(color = Color.White.copy(alpha = 0.5f), radius = 24.dp.toPx() * progress, center = pulsePos)
         }
-        is HandTheme.PaperCutout -> {
-            val steps = 20
-            val path = Path()
-            path.moveTo(start.x, start.y)
-            
-            for (i in 1..(steps * progress).toInt()) {
-                val p = i.toFloat() / steps
-                val point = start + dir * p
-                val seedSeed = i * 12345L
-                val stepRandom = java.util.Random(seedSeed)
-                val jitterX = (stepRandom.nextFloat() - 0.5f) * 24f
-                val jitterY = (stepRandom.nextFloat() - 0.5f) * 24f
-                path.lineTo(point.x + jitterX, point.y + jitterY)
-            }
-            drawPath(path, theme.primaryColor, style = Stroke(width = 12.dp.toPx(), join = StrokeJoin.Round, cap = StrokeCap.Round))
-            
-            if (progress > 0.7f) {
-                val arrowTip = currentEnd
-                val arrowLeft = arrowTip - normDir * 40f + ortho * 24f
-                val arrowRight = arrowTip - normDir * 40f - ortho * 24f
-                
-                val arrowPath = Path().apply {
-                    moveTo(arrowTip.x, arrowTip.y)
-                    lineTo(arrowLeft.x, arrowLeft.y)
-                    lineTo(arrowRight.x, arrowRight.y)
-                    close()
-                }
-                drawPath(arrowPath, theme.primaryColor)
-            }
-        }
+        is HandTheme.PaperCutout -> drawPaperPlaneMove(start, end, progress)
         is HandTheme.Ombromanie -> drawShadowMovePath(start, end, progress)
         is HandTheme.Marginalia -> drawPenFlourish(start, end, progress)
     }

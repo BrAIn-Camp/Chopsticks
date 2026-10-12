@@ -143,95 +143,16 @@ fun GameOverOverlay(
                 ArtisticActionButton(text = "Begin anew", onClick = onRestart, theme = theme)
             }
         } else {
-            // Paper Cutout
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(0.85f)
-                    .wrapContentHeight()
-                    .drawBehind {
-                        val rect = Rect(Offset.Zero, size)
-                        val path = Path()
-                        val steps = 20
-                        val jitter = 5f
-                        val r = java.util.Random(42L)
-                        
-                        path.moveTo(rect.left + r.nextFloat() * jitter, rect.top + r.nextFloat() * jitter)
-                        for (i in 1..steps) {
-                            val x = rect.left + (rect.width / steps) * i
-                            val y = rect.top + (if (i == steps) 0f else (r.nextFloat() - 0.5f) * jitter)
-                            path.lineTo(x, y)
-                        }
-                        for (i in 1..8) {
-                            val x = rect.right + (r.nextFloat() - 0.5f) * jitter
-                            val y = rect.top + (rect.height / 8) * i
-                            path.lineTo(x, y)
-                        }
-                        for (i in 1..steps) {
-                            val x = rect.right - (rect.width / steps) * i
-                            val y = rect.bottom + (if (i == steps) 0f else (r.nextFloat() - 0.5f) * jitter)
-                            path.lineTo(x, y)
-                        }
-                        for (i in 1..8) {
-                            val x = rect.left + (r.nextFloat() - 0.5f) * jitter
-                            val y = rect.bottom - (rect.height / 8) * i
-                            path.lineTo(x, y)
-                        }
-                        path.close()
-                        
-                        drawPath(
-                            path = path,
-                            color = Color(0xFFF4EBE1)
-                        )
-                        drawPath(
-                            path = path,
-                            color = theme.primaryColor.copy(alpha = 0.4f),
-                            style = Stroke(width = 2.dp.toPx())
-                        )
-                        
-                        val stapleW = 12.dp.toPx()
-                        val stapleH = 4.dp.toPx()
-                        val stapleColor = Color(0xFF5A6065)
-                        
-                        drawRect(color = stapleColor, topLeft = Offset(12.dp.toPx(), 12.dp.toPx()), size = Size(stapleW, stapleH))
-                        drawRect(color = stapleColor, topLeft = Offset(rect.right - 12.dp.toPx() - stapleW, 12.dp.toPx()), size = Size(stapleW, stapleH))
-                        drawRect(color = stapleColor, topLeft = Offset(12.dp.toPx(), rect.bottom - 12.dp.toPx() - stapleH), size = Size(stapleW, stapleH))
-                        drawRect(color = stapleColor, topLeft = Offset(rect.right - 12.dp.toPx() - stapleW, rect.bottom - 12.dp.toPx() - stapleH), size = Size(stapleW, stapleH))
-                    }
-                    .padding(32.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    Text(
-                        text = "GAME OVER",
-                        color = Color(0xFF2E1C0C),
-                        fontSize = 36.sp,
-                        fontWeight = FontWeight.Black,
-                        textAlign = TextAlign.Center,
-                        letterSpacing = 1.sp
-                    )
-                    
-                    Spacer(modifier = Modifier.height(8.dp))
-                    
-                    Text(
-                        text = resultText(state),
-                        color = theme.textColor,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center
-                    )
-
-                    Spacer(modifier = Modifier.height(32.dp))
-
-                    ArtisticActionButton(
-                        text = "TRY AGAIN",
-                        onClick = onRestart,
-                        theme = theme,
-                        modifier = Modifier.width(180.dp)
-                    )
+            PaperCurtainCall(
+                result = resultText(state),
+                subtitle = when {
+                    winner == null -> "The crowd can't pick a winner!"
+                    gameMode == GameMode.PvE && winner == "Player 1" -> "The crowd goes wild!"
+                    gameMode == GameMode.PvE -> "The crowd gasps… try again!"
+                    else -> "The crowd goes wild!"
                 }
+            ) {
+                ArtisticActionButton(text = "Play again", onClick = onRestart, theme = theme)
             }
         }
     }

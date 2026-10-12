@@ -12,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.lerp
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.*
 import androidx.compose.ui.platform.LocalDensity
@@ -24,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.chopsticks.domain.model.GameMode
 import com.example.chopsticks.ui.theme.*
+import kotlin.math.PI
 import kotlin.math.sin
 import kotlin.random.Random
 
@@ -48,33 +50,23 @@ fun ThemeTurnOverlay(
         label = "P2Progress"
     ) { state -> if (state == "Player 2") 1f else 0f }
 
-    val p1Area = remember(handBounds, padding) {
-        val l = handBounds["P1_L"]
-        val r = handBounds["P1_R"]
-        if (l != null && r != null) {
-            Rect(
-                left = minOf(l.left, r.left) - padding,
-                top = minOf(l.top, r.top) - padding,
-                right = maxOf(l.right, r.right) + padding,
-                bottom = maxOf(l.bottom, r.bottom) + padding
-            )
-        } else null
+    // Read the bounds on every composition: handBounds is snapshot state that fills in after the
+    // first layout. (Wrapping this in remember(handBounds) cached the empty first result forever.)
+    fun areaOf(leftKey: String, rightKey: String): Rect? {
+        val l = handBounds[leftKey] ?: return null
+        val r = handBounds[rightKey] ?: return null
+        return Rect(
+            left = minOf(l.left, r.left) - padding,
+            top = minOf(l.top, r.top) - padding,
+            right = maxOf(l.right, r.right) + padding,
+            bottom = maxOf(l.bottom, r.bottom) + padding
+        )
     }
-
-    val p2Area = remember(handBounds, padding) {
-        val l = handBounds["P2_L"]
-        val r = handBounds["P2_R"]
-        if (l != null && r != null) {
-            Rect(
-                left = minOf(l.left, r.left) - padding,
-                top = minOf(l.top, r.top) - padding,
-                right = maxOf(l.right, r.right) + padding,
-                bottom = maxOf(l.bottom, r.bottom) + padding
-            )
-        } else null
-    }
+    val p1Area = areaOf("P1_L", "P1_R")
+    val p2Area = areaOf("P2_L", "P2_R")
 
     val flicker = if (theme is HandTheme.Ombromanie) rememberCandleFlicker() else null
+    val sway = if (theme is HandTheme.PaperCutout) rememberPaperSway() else null
 
     Canvas(modifier = Modifier.fillMaxSize()) {
         when (theme) {
@@ -82,7 +74,10 @@ fun ThemeTurnOverlay(
                 drawAnalogSynthTurn(p1Area, p1Progress, p2Area, p2Progress, theme)
             }
             is HandTheme.PaperCutout -> {
-                drawPaperCutoutTurn(p1Area, p1Progress, p2Area, p2Progress, theme)
+                // Spotlights swing onto the active player; the audience hops as the turn changes
+                val t = p1Progress / (p1Progress + p2Progress).coerceAtLeast(0.001f)
+                val spot = if (p1Area != null && p2Area != null) lerp(p2Area, p1Area, t) else p1Area ?: p2Area
+                drawPaperStage(spot, sway?.value ?: 0f, hop = sin(p1Progress * PI.toFloat()))
             }
             is HandTheme.Ombromanie -> {
                 // The lamp swings toward whoever's turn it is
@@ -109,10 +104,6 @@ fun ThemeTurnOverlay(
     
     // Active Stamp / Status Overlay
     Box(modifier = Modifier.fillMaxSize()) {
-        if (theme is HandTheme.PaperCutout) {
-            PaperActiveStamp(p1Area, p1Progress, p2Area, p2Progress, theme)
-        }
-        
         if (gameMode == GameMode.PvE && currentPlayerId == "Player 2") {
             ComputerThinkingStatus(p2Area, theme)
         }
@@ -223,120 +214,25 @@ private fun DrawScope.drawEnergyCable(rect: Rect, progress: Float, color: Color,
     drawCircle(Color.White, radius = 4.dp.toPx(), center = pos)
 }
 
-private fun DrawScope.drawPaperCutoutTurn(
-    p1Area: Rect?,
-    p1Progress: Float,
-    p2Area: Rect?,
-    p2Progress: Float,
-    theme: HandTheme
-) {
-    // Tracing Paper (Dimming layer)
-    if (p1Progress < 0.9f) {
-        p1Area?.let { rect ->
-            drawRect(
-                color = theme.backgroundColor.copy(alpha = 0.5f * (1f - p1Progress)),
-                topLeft = rect.topLeft,
-                size = rect.size
-            )
-            // Texture/Grain could be added here
-        }
-    }
-    
-    if (p2Progress < 0.9f) {
-        p2Area?.let { rect ->
-            drawRect(
-                color = theme.backgroundColor.copy(alpha = 0.5f * (1f - p2Progress)),
-                topLeft = rect.topLeft,
-                size = rect.size
-            )
-        }
-    }
-
-    // Spotlight (Paper shape behind)
-    p1Area?.let { rect -> drawPaperSpotlight(rect, p1Progress, theme.secondaryColor) }
-    p2Area?.let { rect -> drawPaperSpotlight(rect, p2Progress, theme.secondaryColor) }
-}
-
-private fun DrawScope.drawPaperSpotlight(rect: Rect, progress: Float, color: Color) {
-    if (progress <= 0f) return
-    
-    val center = rect.center
-    val w = rect.width * (0.8f + 0.4f * progress)
-    val h = rect.height * (0.8f + 0.4f * progress)
-    
-    val path = Path()
-    val steps = 12
-    val r = java.util.Random(rect.hashCode().toLong())
-    
-    for (i in 0 until steps) {
-        val angle = (i.toFloat() / steps) * 2 * Math.PI
-        val dist = (0.9f + r.nextFloat() * 0.2f) * (if (i % 2 == 0) w else h) / 2
-        val x = center.x + Math.cos(angle).toFloat() * dist
-        val y = center.y + Math.sin(angle).toFloat() * dist
-        if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
-    }
-    path.close()
-    
-    drawPath(path, color.copy(alpha = 0.4f * progress))
-}
-
-@Composable
-private fun PaperActiveStamp(
-    p1Area: Rect?,
-    p1Progress: Float,
-    p2Area: Rect?,
-    p2Progress: Float,
-    theme: HandTheme
-) {
-    if (p1Progress > 0.5f) {
-        p1Area?.let { rect ->
-            ActiveStamp(
-                modifier = Modifier.graphicsLayer {
-                    translationX = rect.right - 20.dp.toPx()
-                    translationY = rect.top + 20.dp.toPx()
-                    alpha = (p1Progress - 0.5f) * 2f
-                    rotationZ = 10f
-                },
-                theme = theme
-            )
-        }
-    }
-    
-    if (p2Progress > 0.5f) {
-        p2Area?.let { rect ->
-            ActiveStamp(
-                modifier = Modifier.graphicsLayer {
-                    translationX = rect.left + 20.dp.toPx()
-                    translationY = rect.bottom - 60.dp.toPx()
-                    alpha = (p2Progress - 0.5f) * 2f
-                    rotationZ = -165f
-                },
-                theme = theme
-            )
-        }
-    }
-}
-
-@Composable
-private fun ActiveStamp(modifier: Modifier, theme: HandTheme) {
-    val time = System.currentTimeMillis() / 200
-    val jitterX = remember(time) { ((Math.random() - 0.5) * 4).toFloat() }
-    val jitterY = remember(time) { ((Math.random() - 0.5) * 4).toFloat() }
-    
-    Box(
-        modifier = modifier
-            .offset(x = jitterX.dp, y = jitterY.dp)
-            .background(theme.primaryColor, RoundedCornerShape(2.dp))
-            .padding(horizontal = 8.dp, vertical = 4.dp)
-    ) {
-        Text("ACTIVE", color = theme.backgroundColor, fontWeight = FontWeight.Black, fontSize = 14.sp)
-    }
-}
-
 @Composable
 private fun ComputerThinkingStatus(p2Area: Rect?, theme: HandTheme) {
     if (p2Area == null) return
-    
+
+    if (theme is HandTheme.PaperCutout) {
+        // A speech bubble just below the computer's hands, tail pointing up at them
+        PaperSpeechBubble(
+            modifier = Modifier.graphicsLayer {
+                translationX = p2Area.center.x - 90.dp.toPx()
+                translationY = p2Area.bottom - 6.dp.toPx()
+            },
+            tailOnTop = true,
+            showStar = false
+        ) {
+            Text("Hmm… let me think…", color = PaperInk.Outline, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+        }
+        return
+    }
+
     val infiniteTransition = rememberInfiniteTransition(label = "ThinkingPulse")
     val alpha by infiniteTransition.animateFloat(
         initialValue = 0.5f,

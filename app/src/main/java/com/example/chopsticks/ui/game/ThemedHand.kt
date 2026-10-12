@@ -17,6 +17,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.example.chopsticks.ui.theme.*
+import kotlin.math.PI
+import kotlin.math.cos
 import kotlin.math.sin
 
 @Composable
@@ -44,7 +46,8 @@ fun ThemedHand(
     )
 
     val activeAlpha by animateFloatAsState(
-        targetValue = if (isActive) 1f else 0.4f,
+        // Paper sprites barely dim: the spotlights already show whose turn it is
+        targetValue = if (isActive) 1f else if (theme is HandTheme.PaperCutout) 0.82f else 0.4f,
         animationSpec = tween(500),
         label = "active_alpha"
     )
@@ -61,18 +64,36 @@ fun ThemedHand(
         label = "shake"
     )
 
+    // Paper Cutout: when it becomes this hand's turn it flips like a sheet of paper, with a little hop
+    val flip = remember { Animatable(0f) }
+    LaunchedEffect(isActive, theme) {
+        if (theme is HandTheme.PaperCutout && isActive) {
+            flip.snapTo(0f)
+            flip.animateTo(1f, tween(500, easing = FastOutSlowInEasing))
+        }
+    }
+
     Box(
         modifier = modifier
             .aspectRatio(0.75f)
             .graphicsLayer {
                 translationX = shakeX
                 alpha = activeAlpha
+                if (theme is HandTheme.PaperCutout) {
+                    scaleX = cos(flip.value * 2f * PI.toFloat())
+                    translationY = -sin(flip.value * PI.toFloat()) * 14.dp.toPx()
+                }
             }
             .drawWithCache {
                 onDrawWithContent {
                     val w = size.width
                     val h = size.height
                     val jitter = if (theme.organicEdges) 4f else 0f
+
+                    if (isDead && theme is HandTheme.PaperCutout) {
+                        drawCrumpledPaper(Offset(w / 2, h * 0.7f), w * 0.2f)
+                        return@onDrawWithContent
+                    }
 
                     if (isDead && theme is HandTheme.Marginalia) {
                         val vacatRect = Rect(Offset(w * 0.14f, h * 0.48f), Size(w * 0.72f, h * 0.48f))
@@ -154,39 +175,8 @@ fun ThemedHand(
                             }
                             drawPath(oscPath, theme.primaryColor, style = Stroke(4.dp.toPx()))
                         }
-                        is HandTheme.PaperCutout -> {
-                            drawPath(palmPath, theme.handColor)
-                            
-                            val linePath = Path().apply {
-                                moveTo(palmRect.center.x, palmRect.top + 15.dp.toPx())
-                                quadraticTo(
-                                    palmRect.left + (if (isLeftHand) palmWidth * 0.8f else palmWidth * 0.2f),
-                                    palmRect.center.y,
-                                    palmRect.center.x,
-                                    palmRect.bottom - 10.dp.toPx()
-                                )
-                                val startX = if (isLeftHand) 15.dp.toPx() else palmWidth - 15.dp.toPx()
-                                val endX = if (isLeftHand) palmWidth - 15.dp.toPx() else 15.dp.toPx()
-                                moveTo(palmRect.left + startX, palmRect.top + 35.dp.toPx())
-                                quadraticTo(
-                                    palmRect.center.x, 
-                                    palmRect.top + 25.dp.toPx(), 
-                                    palmRect.left + endX, 
-                                    palmRect.top + 45.dp.toPx()
-                                )
-                                moveTo(palmRect.left + startX, palmRect.top + 60.dp.toPx())
-                                quadraticTo(
-                                    palmRect.center.x,
-                                    palmRect.top + 55.dp.toPx(),
-                                    palmRect.left + (if (isLeftHand) palmWidth * 0.7f else palmWidth * 0.3f),
-                                    palmRect.top + 75.dp.toPx()
-                                )
-                            }
-                            drawPath(linePath, theme.textColor.copy(alpha = 0.3f), style = Stroke(2.5.dp.toPx(), cap = StrokeCap.Round))
-
-                            drawCircle(theme.primaryColor.copy(alpha = 0.6f), 20.dp.toPx(), Offset(palmRect.left + 20.dp.toPx(), palmRect.top + 25.dp.toPx()))
-                            drawCircle(theme.primaryColor.copy(alpha = 0.4f), 12.dp.toPx(), Offset(palmRect.right - 25.dp.toPx(), palmRect.bottom - 15.dp.toPx()))
-                        }
+                        // Drawn as a whole glove once the fingers are laid out, below
+                        is HandTheme.PaperCutout -> Unit
                         is HandTheme.Ombromanie -> drawShadowPalm(palmRect, isLeftHand, bottom = h)
                         is HandTheme.Marginalia -> drawManuscriptHand(palmRect, isLeftHand, bottom = h, fingers = fingers, textMeasurer = textMeasurer)
                     }
@@ -273,6 +263,11 @@ fun ThemedHand(
                                 (indexPosition - i).coerceAtLeast(0)
                             }
                         }
+                    }
+
+                    if (theme is HandTheme.PaperCutout) {
+                        drawPaperGlove(palmRect, isLeftHand, fingerBases, fingerAngles, fingerLengths, fingerWidths, activeIndices, fingers, textMeasurer)
+                        return@onDrawWithContent
                     }
 
                     for (i in 0 until maxFingers) {
@@ -421,22 +416,8 @@ private fun DrawScope.drawAnatomicalFinger(
                     drawCircle(theme.secondaryColor, radius = segW * 0.45f, center = currentBase)
                     drawCircle(Color.White.copy(alpha=0.25f), radius = segW * 0.2f, center = currentBase - Offset(2.dp.toPx(), 2.dp.toPx()))
                 }
-                is HandTheme.PaperCutout -> {
-                    drawPath(finalPath, theme.fingerColor)
-                    // Staple at joint
-                    val stapleW = segW * 1.3f
-                    drawRect(
-                        color = Color(0xFF9E9E9E),
-                        topLeft = Offset(currentBase.x - stapleW / 2, currentBase.y - 2.dp.toPx()),
-                        size = Size(stapleW, 5.dp.toPx())
-                    )
-                    // Knuckle ridge - anatomical detail
-                    val ridgePath = Path().apply {
-                        moveTo(currentBase.x - segW * 0.4f, currentBase.y - segLength * 0.55f)
-                        quadraticTo(currentBase.x, currentBase.y - segLength * 0.7f, currentBase.x + segW * 0.4f, currentBase.y - segLength * 0.55f)
-                    }
-                    drawPath(ridgePath, theme.textColor.copy(alpha = 0.25f), style = Stroke(1.5.dp.toPx()))
-                }
+                // The glove is drawn whole by drawPaperGlove, never segment by segment
+                is HandTheme.PaperCutout -> Unit
                 // A silhouette has no inner detail: the shape is everything
                 is HandTheme.Ombromanie -> {
                     drawPath(finalPath, theme.fingerColor)

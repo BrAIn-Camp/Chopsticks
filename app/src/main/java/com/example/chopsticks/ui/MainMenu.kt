@@ -248,45 +248,7 @@ fun ChopsticksBackground(
                 )
             }
 
-            is HandTheme.PaperCutout -> {
-                // Rough hand-cut texture
-                val brown = Color(0xFF8B4513)
-                
-                listOf(-40f, 50f).forEach { angle ->
-                    withTransform({
-                        rotate(angle, Offset(centerX, centerY))
-                    }) {
-                        val stickPath = Path().apply {
-                            val startX = centerX - 110.dp.toPx() * scale
-                            val endX = centerX + 110.dp.toPx() * scale
-                            val yTop = centerY - 8.dp.toPx() * scale
-                            val yBottom = centerY + 8.dp.toPx() * scale
-                            
-                            moveTo(startX, yTop)
-                            // Add jitter for "hand-cut" look
-                            lineTo(centerX, yTop + 2.dp.toPx() * scale)
-                            lineTo(endX, yTop - 1.dp.toPx() * scale)
-                            lineTo(endX + 2.dp.toPx() * scale, yBottom + 1.dp.toPx() * scale)
-                            lineTo(centerX, yBottom - 2.dp.toPx() * scale)
-                            lineTo(startX - 2.dp.toPx() * scale, yBottom + 2.dp.toPx() * scale)
-                            close()
-                        }
-                        drawPath(path = stickPath, color = brown)
-                    }
-                }
-
-                // Staples/Tape at intersection
-                drawRect(
-                    color = Color.LightGray.copy(alpha = 0.8f),
-                    topLeft = Offset(centerX - 10.dp.toPx() * scale, centerY - 15.dp.toPx() * scale),
-                    size = Size(20.dp.toPx() * scale, 30.dp.toPx() * scale)
-                )
-                drawRect(
-                    color = Color.LightGray.copy(alpha = 0.8f),
-                    topLeft = Offset(centerX - 15.dp.toPx() * scale, centerY - 5.dp.toPx() * scale),
-                    size = Size(30.dp.toPx() * scale, 10.dp.toPx() * scale)
-                )
-            }
+            is HandTheme.PaperCutout -> drawPaperChopsticks(scale)
 
             is HandTheme.Ombromanie -> drawShadowChopsticks(scale)
             is HandTheme.Marginalia -> drawManuscriptChopsticks(scale)
