@@ -29,6 +29,9 @@ import androidx.compose.ui.text.style.TextAlign
 import com.example.chopsticks.ui.theme.HandTheme
 import kotlinx.coroutines.delay
 import kotlin.random.Random
+import androidx.compose.ui.graphics.*
+import androidx.compose.ui.graphics.drawscope.*
+import androidx.compose.ui.text.*
 
 @Composable
 fun SectionHeader(text: String, theme: HandTheme) {
@@ -140,190 +143,6 @@ fun RuleToggle(
 }
 
 @Composable
-fun ThemeBackground(theme: HandTheme) {
-    when (theme) {
-        is HandTheme.AnalogSynth -> {
-            val infiniteTransition = rememberInfiniteTransition(label = "synth_bg")
-            val gridOffset by infiniteTransition.animateFloat(
-                initialValue = 0f,
-                targetValue = 1f,
-                animationSpec = infiniteRepeatable(
-                    animation = tween(4000, easing = LinearEasing),
-                    repeatMode = RepeatMode.Restart
-                ),
-                label = "grid_offset"
-            )
-            val scanlineOffset by infiniteTransition.animateFloat(
-                initialValue = 0f,
-                targetValue = 1f,
-                animationSpec = infiniteRepeatable(
-                    animation = tween(6000, easing = LinearEasing),
-                    repeatMode = RepeatMode.Restart
-                ),
-                label = "scanline_offset"
-            )
-            val pulseGlow by infiniteTransition.animateFloat(
-                initialValue = 0.3f,
-                targetValue = 1f,
-                animationSpec = infiniteRepeatable(
-                    animation = tween(2000, easing = LinearEasing),
-                    repeatMode = RepeatMode.Reverse
-                ),
-                label = "pulse_glow"
-            )
-
-            Canvas(modifier = Modifier.fillMaxSize()) {
-                // Background: Pure charcoal/black
-                drawRect(Color(0xFF08080A))
-
-                val width = size.width
-                val height = size.height
-
-                // Draw neon grid (perspective)
-                val horizonY = height * 0.3f
-                val gridColor = theme.primaryColor.copy(alpha = 0.12f)
-
-                // Vertical perspective lines
-                val numVerticalLines = 14
-                for (i in 0..numVerticalLines) {
-                    val fraction = i.toFloat() / numVerticalLines
-                    val startX = width * 0.5f + (fraction - 0.5f) * width * 0.3f
-                    val endX = width * 0.5f + (fraction - 0.5f) * width * 3.0f
-                    drawLine(
-                        color = gridColor,
-                        start = Offset(startX, horizonY),
-                        end = Offset(endX, height),
-                        strokeWidth = 1.dp.toPx()
-                    )
-                }
-
-                // Horizontal moving lines
-                val numHorizontalLines = 12
-                for (i in 0 until numHorizontalLines) {
-                    val rawFraction = (i.toFloat() + gridOffset) / numHorizontalLines
-                    val perspectiveFraction = (rawFraction * rawFraction) // Closer spacing at top
-                    val y = horizonY + (height - horizonY) * perspectiveFraction
-
-                    drawLine(
-                        color = gridColor,
-                        start = Offset(0f, y),
-                        end = Offset(width, y),
-                        strokeWidth = 0.5.dp.toPx() + perspectiveFraction * 1.5.dp.toPx()
-                    )
-                }
-
-                // CRT scanlines
-                val scanlineSpacing = 4.dp.toPx()
-                val scanlineYOffset = scanlineOffset * scanlineSpacing
-                var currentScanlineY = scanlineYOffset
-                while (currentScanlineY < height) {
-                    drawLine(
-                        color = Color.Black.copy(alpha = 0.1f),
-                        start = Offset(0f, currentScanlineY),
-                        end = Offset(width, currentScanlineY),
-                        strokeWidth = 1.dp.toPx()
-                    )
-                    currentScanlineY += scanlineSpacing
-                }
-
-                // Digital glitches / glowing nodes
-                val random = java.util.Random(42)
-                for (n in 0..5) {
-                    val nx = random.nextFloat() * width
-                    val ny = horizonY + random.nextFloat() * (height - horizonY)
-                    val radius = (3.dp.toPx() + random.nextFloat() * 5.dp.toPx()) * pulseGlow
-                    
-                    drawCircle(
-                        color = theme.fingerColor.copy(alpha = 0.2f * pulseGlow),
-                        radius = radius * 2f,
-                        center = Offset(nx, ny)
-                    )
-                    drawCircle(
-                        color = theme.fingerColor.copy(alpha = 0.8f),
-                        radius = radius * 0.4f,
-                        center = Offset(nx, ny)
-                    )
-                }
-            }
-        }
-        is HandTheme.PaperCutout -> {
-            var frameTrigger by remember { mutableIntStateOf(0) }
-            LaunchedEffect(Unit) {
-                while (true) {
-                    delay(200)
-                    frameTrigger = (frameTrigger + 1) % 4
-                }
-            }
-
-            val infiniteTransition = rememberInfiniteTransition(label = "paper_bg")
-            val moteProgress by infiniteTransition.animateFloat(
-                initialValue = 0f,
-                targetValue = 1f,
-                animationSpec = infiniteRepeatable(
-                    animation = tween(12000, easing = LinearEasing),
-                    repeatMode = RepeatMode.Restart
-                ),
-                label = "mote_progress"
-            )
-
-            Canvas(modifier = Modifier.fillMaxSize()) {
-                // Background: Textured cream/off-white
-                drawRect(theme.backgroundColor)
-
-                val width = size.width
-                val height = size.height
-
-                // Stop-motion jitter effect
-                val jitterRand = java.util.Random((frameTrigger + 1).toLong() * 97)
-                
-                // Paper texture flecks
-                for (i in 0..50) {
-                    val fx = jitterRand.nextFloat() * width
-                    val fy = jitterRand.nextFloat() * height
-                    val length = 1.dp.toPx() + jitterRand.nextFloat() * 5.dp.toPx()
-                    val angle = jitterRand.nextFloat() * Math.PI * 2
-                    
-                    drawLine(
-                        color = theme.secondaryColor.copy(alpha = 0.3f),
-                        start = Offset(fx, fy),
-                        end = Offset(
-                            fx + Math.cos(angle).toFloat() * length,
-                            fy + Math.sin(angle).toFloat() * length
-                        ),
-                        strokeWidth = 0.5.dp.toPx()
-                    )
-                }
-
-                // Drifting ink motes
-                val moteRand = java.util.Random(2024)
-                for (i in 0..12) {
-                    val startX = moteRand.nextFloat() * width
-                    val startY = moteRand.nextFloat() * height
-                    
-                    val driftX = (moteProgress * width * 0.05f)
-                    val driftY = -(moteProgress * height * 0.08f)
-                    
-                    var mx = (startX + driftX) % width
-                    var my = (startY + driftY) % height
-                    if (mx < 0) mx += width
-                    if (my < 0) my += height
-
-                    // Jitter particle for stop-motion
-                    val pmx = mx + (jitterRand.nextFloat() - 0.5f) * 1.5.dp.toPx()
-                    val pmy = my + (jitterRand.nextFloat() - 0.5f) * 1.5.dp.toPx()
-
-                    drawCircle(
-                        color = theme.primaryColor.copy(alpha = 0.15f),
-                        radius = (1.dp + 2.dp * moteRand.nextFloat()).toPx(),
-                        center = Offset(pmx, pmy)
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
 fun ArtisticActionButton(
     text: String,
     onClick: () -> Unit,
@@ -331,6 +150,11 @@ fun ArtisticActionButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true
 ) {
+    val buttonAlpha by animateFloatAsState(
+        targetValue = if (enabled) 1f else 0.5f,
+        label = "button_alpha"
+    )
+
     if (theme is HandTheme.AnalogSynth) {
         val infiniteTransition = rememberInfiniteTransition(label = "led_glow")
         val alphaGlow by infiniteTransition.animateFloat(
@@ -346,6 +170,7 @@ fun ArtisticActionButton(
         Box(
             modifier = modifier
                 .height(48.dp)
+                .graphicsLayer { alpha = buttonAlpha }
                 .clip(RoundedCornerShape(8.dp))
                 .background(Color(0xFF252525))
                 .border(
@@ -388,6 +213,7 @@ fun ArtisticActionButton(
         Box(
             modifier = modifier
                 .height(48.dp)
+                .graphicsLayer { alpha = buttonAlpha }
                 .drawBehind {
                     val rect = Rect(Offset.Zero, size)
                     val path = Path()
