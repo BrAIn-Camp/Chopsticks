@@ -70,7 +70,7 @@ fun ChopsticksTheme(
 
     MaterialTheme(
         colorScheme = colorScheme,
-        typography = if (handTheme is HandTheme.Ombromanie) chopsticksTypography(FontFamily.Serif) else Typography,
+        typography = if (handTheme?.serifType == true) chopsticksTypography(FontFamily.Serif) else Typography,
         shapes = SharpShapes,
         content = content
     )

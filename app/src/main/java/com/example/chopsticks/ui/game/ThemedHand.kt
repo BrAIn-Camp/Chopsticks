@@ -31,7 +31,8 @@ fun ThemedHand(
     isActive: Boolean = true
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "hand_animations")
-    
+    val textMeasurer = rememberTextMeasurer()
+
     val pulse by infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = 1f,
@@ -72,6 +73,12 @@ fun ThemedHand(
                     val w = size.width
                     val h = size.height
                     val jitter = if (theme.organicEdges) 4f else 0f
+
+                    if (isDead && theme is HandTheme.Marginalia) {
+                        val vacatRect = Rect(Offset(w * 0.14f, h * 0.48f), Size(w * 0.72f, h * 0.48f))
+                        drawManuscriptVacat(vacatRect, isLeftHand, h, textMeasurer)
+                        return@onDrawWithContent
+                    }
 
                     if (isDead && theme is HandTheme.Ombromanie) {
                         val ghostRect = Rect(Offset(w * 0.14f, h * 0.48f), Size(w * 0.72f, h * 0.48f))
@@ -181,6 +188,7 @@ fun ThemedHand(
                             drawCircle(theme.primaryColor.copy(alpha = 0.4f), 12.dp.toPx(), Offset(palmRect.right - 25.dp.toPx(), palmRect.bottom - 15.dp.toPx()))
                         }
                         is HandTheme.Ombromanie -> drawShadowPalm(palmRect, isLeftHand, bottom = h)
+                        is HandTheme.Marginalia -> drawManuscriptHand(palmRect, isLeftHand, bottom = h, fingers = fingers, textMeasurer = textMeasurer)
                     }
 
                     // --- DRAW FINGERS ---
@@ -435,6 +443,7 @@ private fun DrawScope.drawAnatomicalFinger(
                     // Same-colour outline seals the hairline seams between segments
                     drawPath(finalPath, theme.fingerColor, style = Stroke(1.5.dp.toPx()))
                 }
+                is HandTheme.Marginalia -> drawManuscriptFingerSegment(finalPath, segRect)
             }
             
             currentBase = Offset(currentBase.x, currentBase.y - segLength)

@@ -13,6 +13,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.unit.dp
 import com.example.chopsticks.ui.theme.HandTheme
+import com.example.chopsticks.ui.theme.ManuscriptBackground
 import com.example.chopsticks.ui.theme.ShadowTheatreBackground
 import kotlinx.coroutines.delay
 import kotlin.math.cos
@@ -28,6 +29,7 @@ fun DynamicBackground(theme: HandTheme, modifier: Modifier = Modifier) {
             is HandTheme.AnalogSynth -> AnalogSynthBackground(theme = theme)
             is HandTheme.PaperCutout -> PaperCutoutBackground(theme = theme)
             is HandTheme.Ombromanie -> ShadowTheatreBackground()
+            is HandTheme.Marginalia -> ManuscriptBackground()
         }
     }
 }

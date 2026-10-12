@@ -130,6 +130,18 @@ fun GameOverOverlay(
             ) {
                 ArtisticActionButton(text = "Encore", onClick = onRestart, theme = theme)
             }
+        } else if (theme is HandTheme.Marginalia) {
+            ManuscriptColophon(
+                result = resultText(state),
+                subtitle = when {
+                    winner == null -> "Neither hand prevailed."
+                    gameMode == GameMode.PvE && winner == "Player 1" -> "Here endeth the game, in thy favour."
+                    gameMode == GameMode.PvE -> "Here endeth the game. The machine prevaileth."
+                    else -> "Here endeth the game."
+                }
+            ) {
+                ArtisticActionButton(text = "Begin anew", onClick = onRestart, theme = theme)
+            }
         } else {
             // Paper Cutout
             Box(

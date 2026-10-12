@@ -53,7 +53,7 @@ fun MainMenu(
     onHowToPlay: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val safeTheme = currentTheme ?: HandTheme.AnalogSynth
+    val safeTheme = currentTheme ?: HandTheme.Default
     var gameMode by remember { mutableStateOf(GameMode.PvE) }
     
     val scrollState = rememberScrollState()
@@ -289,6 +289,7 @@ fun ChopsticksBackground(
             }
 
             is HandTheme.Ombromanie -> drawShadowChopsticks(scale)
+            is HandTheme.Marginalia -> drawManuscriptChopsticks(scale)
         }
     }
 }

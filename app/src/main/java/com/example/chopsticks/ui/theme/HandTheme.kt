@@ -15,7 +15,9 @@ sealed class HandTheme(
     val cornerRadius: Dp = 0.dp,
     val organicEdges: Boolean = false,
     val plasticTexture: Boolean = false,
-    val isDark: Boolean = true
+    val isDark: Boolean = true,
+    /** Use a serif typeface for this theme's text instead of the default monospace. */
+    val serifType: Boolean = false
 ) {
     object AnalogSynth : HandTheme(
         name = "Analog Synth",
@@ -52,7 +54,22 @@ sealed class HandTheme(
         fingerColor = Color(0xFF15100E),
         textColor = Color(0xFF22140F),
         cornerRadius = 0.dp,
-        isDark = false
+        isDark = false,
+        serifType = true
+    )
+
+    /** A page of a medieval manuscript. See Manuscript.kt. */
+    object Marginalia : HandTheme(
+        name = "Marginalia",
+        backgroundColor = Color(0xFFEFE2C4),
+        primaryColor = Color(0xFF22408F),
+        secondaryColor = Color(0xFFC9A13B),
+        handColor = Color(0xFF2B1C12),
+        fingerColor = Color(0xFF2B1C12),
+        textColor = Color(0xFF2B1C12),
+        cornerRadius = 0.dp,
+        isDark = false,
+        serifType = true
     )
 
     companion object {
@@ -62,9 +79,13 @@ sealed class HandTheme(
          */
         val allThemes: List<HandTheme>
             get() = listOfNotNull(
+                Ombromanie,
+                Marginalia,
                 AnalogSynth,
-                PaperCutout,
-                Ombromanie
+                PaperCutout
             )
+
+        /** The theme new players start with. */
+        val Default: HandTheme get() = Ombromanie
     }
 }

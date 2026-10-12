@@ -93,6 +93,17 @@ fun ThemeTurnOverlay(
                 drawLampLitScreen(lamp, f)
                 drawSideCurtains(f)
             }
+            is HandTheme.Marginalia -> {
+                drawManuscriptPage()
+                drawIvyBorder(10.dp.toPx(), 0f, size.height)
+                drawIvyBorder(size.width - 10.dp.toPx(), 0f, size.height)
+                // A manicule slides and turns to point at whoever's turn it is
+                val gap = 8.dp.toPx()
+                val p1Tip = Offset(size.width / 2, (p1Area?.top ?: size.height * 0.6f) - gap)
+                val p2Tip = Offset(size.width / 2, (p2Area?.bottom ?: size.height * 0.4f) + gap)
+                val t = p1Progress / (p1Progress + p2Progress).coerceAtLeast(0.001f)
+                drawManicule(p2Tip + (p1Tip - p2Tip) * t, angleDegrees = -90f + 180f * t, scale = 1.1f)
+            }
         }
     }
     
@@ -351,9 +362,9 @@ private fun ComputerThinkingStatus(p2Area: Rect?, theme: HandTheme) {
             }
             .padding(horizontal = 8.dp, vertical = 4.dp)
     ) {
-        if (theme is HandTheme.Ombromanie) {
+        if (theme is HandTheme.Ombromanie || theme is HandTheme.Marginalia) {
             Text(
-                text = "the shadows deliberate…",
+                text = if (theme is HandTheme.Marginalia) "the scribe deliberates…" else "the shadows deliberate…",
                 color = theme.textColor,
                 fontSize = 13.sp,
                 fontStyle = FontStyle.Italic,

@@ -146,5 +146,6 @@ fun DrawScope.drawMovePath(
             }
         }
         is HandTheme.Ombromanie -> drawShadowMovePath(start, end, progress)
+        is HandTheme.Marginalia -> drawPenFlourish(start, end, progress)
     }
 }

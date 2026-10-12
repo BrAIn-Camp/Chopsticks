@@ -35,7 +35,7 @@ class GameViewModel(private val repository: SettingsRepository) : ViewModel() {
     val difficulty: StateFlow<Difficulty> = _difficulty.asStateFlow()
 
     private val _theme = MutableStateFlow(
-        HandTheme.allThemes.find { it.name == repository.loadThemeName() } ?: HandTheme.AnalogSynth
+        HandTheme.allThemes.find { it.name == repository.loadThemeName() } ?: HandTheme.Default
     )
     val theme: StateFlow<HandTheme> = _theme.asStateFlow()
 
