@@ -26,7 +26,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.chopsticks.domain.ai.HintResult
 import com.example.chopsticks.domain.ai.Move
 import com.example.chopsticks.domain.engine.RulesEngine
 import com.example.chopsticks.domain.model.GameMode
@@ -65,6 +64,9 @@ fun GameScreen(
     
     var transferChoice by remember { mutableStateOf<TransferChoice?>(null) }
     var condenseChoice by remember { mutableStateOf<CondenseChoice?>(null) }
+
+    // Which analysed move is shown as an arrow on the board; reset whenever a new analysis arrives
+    var previewMove by remember(hintResult) { mutableStateOf<Move?>(null) }
 
     Box(
         modifier = modifier
@@ -410,13 +412,15 @@ fun GameScreen(
             theme = theme
         )
 
-        // Hint Move Suggestion
-        hintResult?.let { hint ->
-            HintMoveOverlay(
-                move = hint.move,
-                handBounds = handBounds,
-                theme = theme
-            )
+        // Arrow for the move being previewed from the hint analysis
+        if (hintResult != null) {
+            previewMove?.let { move ->
+                HintMoveOverlay(
+                    move = move,
+                    handBounds = handBounds,
+                    theme = theme
+                )
+            }
         }
 
         // Transfer Choice
@@ -502,13 +506,26 @@ fun GameScreen(
             )
         }
 
-        // HINT OVERLAY (Educational Explanation)
-        hintResult?.let { hint ->
-            HintDialog(
-                hint = hint,
-                theme = theme,
-                onDismiss = { viewModel.clearHint() }
-            )
+        // Full analysis of every move, or a compact bar while one is previewed on the board
+        hintResult?.let { analysis ->
+            val preview = previewMove?.let { move -> analysis.moves.find { it.move == move } }
+            if (preview != null) {
+                HintPreviewBar(
+                    move = preview,
+                    theme = theme,
+                    onBack = { previewMove = null },
+                    onPlay = { viewModel.playHintMove(preview.move) },
+                    onClose = { viewModel.clearHint() }
+                )
+            } else {
+                HintPanel(
+                    analysis = analysis,
+                    theme = theme,
+                    onShowOnBoard = { previewMove = it },
+                    onPlay = { viewModel.playHintMove(it) },
+                    onClose = { viewModel.clearHint() }
+                )
+            }
         }
     }
 }

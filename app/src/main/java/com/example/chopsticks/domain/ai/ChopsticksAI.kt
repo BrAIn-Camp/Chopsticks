@@ -4,21 +4,9 @@ import com.example.chopsticks.domain.engine.RulesEngine
 import com.example.chopsticks.domain.model.Difficulty
 import com.example.chopsticks.domain.model.GameState
 import com.example.chopsticks.domain.model.Hand
-import com.example.chopsticks.domain.model.Player
 import com.example.chopsticks.domain.model.Position
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-
-enum class HintCategory {
-    OFFENSIVE, DEFENSIVE, SETUP, VICTORY
-}
-
-data class HintResult(
-    val move: Move,
-    val mateInSteps: Int?,
-    val explanation: String,
-    val category: HintCategory
-)
 
 object ChopsticksAI {
 
@@ -34,212 +22,9 @@ object ChopsticksAI {
             Difficulty.EASY -> getBestMoveMinimax(state, depth = 1)
             Difficulty.MEDIUM -> getBestMoveMinimax(state, depth = 2)
             Difficulty.HARD -> getBestMoveMinimax(state, depth = 4)
-            Difficulty.PERFECT -> getBestMoveMinimax(state, depth = 12)
+            // Exact play: fastest forced win, longest defence, or holding a draw
+            Difficulty.PERFECT -> GameSolver(state).bestMoves(state).random()
         }
-    }
-
-    suspend fun getHint(state: GameState): HintResult? = withContext(Dispatchers.Default) {
-        val depth = 12
-        val currentPlayerId = state.currentPlayerId
-        val (move, bestScore) = scoreMoves(state, depth).maxByOrNull { it.second } ?: return@withContext null
-
-        val nextState = applyMove(state, move)
-        val opponentId = state.getOpponentPlayer().id
-
-        // Determine category and explanation
-        val mateInSteps = if (bestScore >= WIN_SCORE) {
-            depth - (bestScore - WIN_SCORE)
-        } else null
-
-        val category: HintCategory
-        if (mateInSteps != null || nextState.winnerId == currentPlayerId) {
-            category = HintCategory.VICTORY
-        } else {
-            // Check for immediate threats in current state
-            val opponentMoves = getPossibleMoves(state.copy(currentPlayerId = opponentId))
-            var isThreatened = false
-            for (om in opponentMoves) {
-                val threatState = applyMove(state.copy(currentPlayerId = opponentId), om)
-                if (threatState.getPlayer(currentPlayerId).isDefeated(state.ruleset.maxFingers, state.ruleset.exactFive)) {
-                    isThreatened = true
-                    break
-                }
-            }
-
-            // Check if move prevents a loss next turn
-            val nextOpponentMoves = getPossibleMoves(nextState)
-            var canOpponentKillNext = false
-            for (om in nextOpponentMoves) {
-                val s = applyMove(nextState, om)
-                if (s.winnerId == opponentId) {
-                    canOpponentKillNext = true
-                    break
-                }
-            }
-
-            // Simplified offensive check: Did we kill a hand?
-            val opponent = state.getOpponentPlayer()
-            val nextOpponent = nextState.getPlayer(opponentId)
-            val killedHand = (opponent.leftHand.fingers > 0 && nextOpponent.leftHand.fingers == 0) ||
-                             (opponent.rightHand.fingers > 0 && nextOpponent.rightHand.fingers == 0)
-
-            if (killedHand) {
-                category = HintCategory.OFFENSIVE
-            } else if (isThreatened && !canOpponentKillNext) {
-                category = HintCategory.DEFENSIVE
-            } else {
-                category = HintCategory.SETUP
-            }
-        }
-
-        val explanation = generateStrategicExplanation(state, nextState, move, mateInSteps, category)
-        HintResult(move, mateInSteps, explanation, category)
-    }
-
-    private fun generateStrategicExplanation(
-        state: GameState,
-        nextState: GameState,
-        move: Move,
-        mateInSteps: Int?,
-        category: HintCategory
-    ): String {
-        val currentPlayer = state.getCurrentPlayer()
-        val nextPlayer = nextState.getPlayer(state.currentPlayerId)
-        val opponent = state.getOpponentPlayer()
-        val nextOpponent = nextState.getPlayer(opponent.id)
-        val maxFingers = state.ruleset.maxFingers
-        val currentPlayerId = state.currentPlayerId
-
-        val curL = currentPlayer.leftHand.fingers
-        val curR = currentPlayer.rightHand.fingers
-        val nextL = nextPlayer.leftHand.fingers
-        val nextR = nextPlayer.rightHand.fingers
-
-        val oppL = opponent.leftHand.fingers
-        val oppR = opponent.rightHand.fingers
-
-        val futureAdvantage = "This secures a stronger position for the next 3 turns by limiting the opponent's ability to reach the limit."
-
-        return when (category) {
-            HintCategory.VICTORY -> {
-                if (nextState.winnerId == currentPlayerId) {
-                    "This move wins the game immediately! By removing their final hand, you've secured total dominance and finished the mathematical sequence."
-                } else {
-                    "This move begins a ${mateInSteps}-step sequence where every counter-move by the opponent leads to their defeat. You are mathematically forcing a win by controlling the finger parity."
-                }
-            }
-            HintCategory.OFFENSIVE -> {
-                val killedHand = if (opponent.leftHand.fingers > 0 && nextOpponent.leftHand.fingers == 0) "left" else "right"
-                
-                if (move is Move.Attack) {
-                    val attackingFingers = if (move.fromHandIndex == 0) curL else curR
-                    val targetFingers = if (move.toHandIndex == 0) oppL else oppR
-                    val resultFingers = if (move.toHandIndex == 0) nextOpponent.leftHand.fingers else nextOpponent.rightHand.fingers
-                    
-                    if (resultFingers == 0) {
-                        "By removing their $killedHand hand using your $attackingFingers-finger hand, you cut their attacking power in half and force them into a more predictable strategy."
-                    } else if (state.ruleset.overflow && resultFingers < targetFingers) {
-                        "By attacking with $attackingFingers fingers, you force the opponent's hand to overflow back to $resultFingers, resetting their offensive pressure and delaying their victory path."
-                    } else {
-                        "Attacking with $attackingFingers fingers increases their $killedHand hand to $resultFingers, pushing them closer to the $maxFingers-finger limit and destabilizing their formation."
-                    }
-                } else {
-                    "This move improves your offensive capability, putting you in a position to eliminate the opponent's $killedHand hand in the coming turns."
-                }
-            }
-            HintCategory.DEFENSIVE -> {
-                val threatenedHandIndex = findThreatenedHandIndex(state)
-                val threatenedHandName = if (threatenedHandIndex == 0) "left" else "right"
-                val threatSourceIndex = findThreatSourceIndex(state, threatenedHandIndex)
-                val threatSourceName = if (threatSourceIndex == 0) "left" else "right"
-                val threatFingers = if (threatSourceIndex == 0) oppL else oppR
-
-                val baseDef = "Your $threatenedHandName hand was at risk of being killed by the opponent's $threatFingers-finger $threatSourceName hand. This move neutralizes that threat."
-                
-                if (move is Move.Transfer || move is Move.Condense) {
-                    "$baseDef By shifting your state from [$curL, $curR] to [$nextL, $nextR], you create balanced protection and move your vulnerable hand out of their reach."
-                } else {
-                    "$baseDef $futureAdvantage"
-                }
-            }
-            HintCategory.SETUP -> {
-                val moveDetail = when (move) {
-                    is Move.Transfer -> "shifting your state from [$curL, $curR] to [$nextL, $nextR]"
-                    is Move.Condense -> "condensing your hands from [$curL, $curR] to [$nextL, $nextR]"
-                    is Move.ExchangeLife -> {
-                        val revivedHand = if (nextPlayer.leftHand.fingers > 0 && currentPlayer.leftHand.fingers == 0) "left" else "right"
-                        val revivedFingers = if (revivedHand == "left") nextL else nextR
-                        "this revival brings your $revivedHand hand back with $revivedFingers fingers, forcing the opponent to split their focus and giving you a numerical advantage."
-                    }
-                    else -> "improving your position to a state of [$nextL, $nextR]"
-                }
-
-                val tacticalLogic = if (nextL == nextR && nextL > 0) {
-                    "creating balanced protection against the opponent's ${maxOf(oppL, oppR)}-finger hand."
-                } else if (nextL + nextR > curL + curR) {
-                    "increasing your total finger count to maintain mathematical flexibility."
-                } else {
-                    "limiting the opponent's counter-attack options while preparing for an offensive push."
-                }
-
-                "By $moveDetail, you are $tacticalLogic $futureAdvantage"
-            }
-        }
-    }
-
-    private fun findThreatenedHandIndex(state: GameState): Int {
-        val currentPlayer = state.getCurrentPlayer()
-        val opponent = state.getOpponentPlayer()
-        val maxFingers = state.ruleset.maxFingers
-        val exactFive = state.ruleset.exactFive
-        
-        for (ph in 0..1) {
-            val playerHand = if (ph == 0) currentPlayer.leftHand else currentPlayer.rightHand
-            if (playerHand.isDead(maxFingers, exactFive)) continue
-            
-            for (oh in 0..1) {
-                val opponentHand = if (oh == 0) opponent.leftHand else opponent.rightHand
-                if (opponentHand.isDead(maxFingers, exactFive)) continue
-                
-                val total = playerHand.fingers + opponentHand.fingers
-                if (state.ruleset.overflow) {
-                    if (total % maxFingers == 0) return ph
-                } else {
-                    if (exactFive) {
-                        if (total == maxFingers) return ph
-                    } else if (total >= maxFingers) {
-                        return ph
-                    }
-                }
-            }
-        }
-        return 0 // Fallback
-    }
-
-    private fun findThreatSourceIndex(state: GameState, threatenedHandIndex: Int): Int {
-        val currentPlayer = state.getCurrentPlayer()
-        val opponent = state.getOpponentPlayer()
-        val maxFingers = state.ruleset.maxFingers
-        val exactFive = state.ruleset.exactFive
-        
-        val targetHand = if (threatenedHandIndex == 0) currentPlayer.leftHand else currentPlayer.rightHand
-        
-        for (oh in 0..1) {
-            val opponentHand = if (oh == 0) opponent.leftHand else opponent.rightHand
-            if (opponentHand.isDead(maxFingers, exactFive)) continue
-            
-            val total = targetHand.fingers + opponentHand.fingers
-            if (state.ruleset.overflow) {
-                if (total % maxFingers == 0) return oh
-            } else {
-                if (exactFive) {
-                    if (total == maxFingers) return oh
-                } else if (total >= maxFingers) {
-                    return oh
-                }
-            }
-        }
-        return 0 // Fallback
     }
 
     /**
@@ -358,6 +143,4 @@ object ChopsticksAI {
     fun getPossibleMoves(state: GameState): List<Move> = RulesEngine.legalMoves(state)
 
     internal fun applyMove(state: GameState, move: Move): GameState = RulesEngine.applyMove(state, move)
-
-    private fun GameState.getPlayer(id: String): Player = if (player1.id == id) player1 else player2
 }

@@ -20,7 +20,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 import com.example.chopsticks.data.SettingsRepository
-import com.example.chopsticks.domain.ai.HintResult
+import com.example.chopsticks.domain.ai.GameSolver
+import com.example.chopsticks.domain.ai.HintAnalysis
+import com.example.chopsticks.domain.ai.HintAnalyzer
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 class GameViewModel(private val repository: SettingsRepository) : ViewModel() {
 
@@ -41,8 +45,8 @@ class GameViewModel(private val repository: SettingsRepository) : ViewModel() {
     private val _invalidMoveHand = MutableStateFlow<Pair<String, Int>?>(null)
     val invalidMoveHand: StateFlow<Pair<String, Int>?> = _invalidMoveHand.asStateFlow()
 
-    private val _hintState = MutableStateFlow<HintResult?>(null)
-    val hintState: StateFlow<HintResult?> = _hintState.asStateFlow()
+    private val _hintState = MutableStateFlow<HintAnalysis?>(null)
+    val hintState: StateFlow<HintAnalysis?> = _hintState.asStateFlow()
 
     private val _isHintLoading = MutableStateFlow(false)
     val isHintLoading: StateFlow<Boolean> = _isHintLoading.asStateFlow()
@@ -57,6 +61,9 @@ class GameViewModel(private val repository: SettingsRepository) : ViewModel() {
     /** The move animation and any AI reply that follows it. Cancelled when a new game starts. */
     private var moveJob: Job? = null
     private var hintJob: Job? = null
+
+    /** Reused between hints in the same game: it already knows every position reachable from the start. */
+    private var solver: GameSolver? = null
 
     /** How many times each position has occurred this game, for draw by repetition. */
     private val positionCounts = mutableMapOf<Position, Int>()
@@ -118,7 +125,11 @@ class GameViewModel(private val repository: SettingsRepository) : ViewModel() {
         hintJob = viewModelScope.launch {
             _isHintLoading.value = true
             try {
-                val hint = ChopsticksAI.getHint(currentState)
+                val cached = solver
+                val hint = withContext(Dispatchers.Default) {
+                    val s = cached?.takeIf { it.covers(currentState) } ?: GameSolver(currentState)
+                    s to HintAnalyzer.analyze(currentState, s)
+                }.let { (s, analysis) -> solver = s; analysis }
                 // Drop the hint if the board moved on while it was being worked out
                 if (_uiState.value.position == currentState.position && !_uiState.value.isGameOver) {
                     _hintState.value = hint
@@ -128,6 +139,9 @@ class GameViewModel(private val repository: SettingsRepository) : ViewModel() {
             }
         }
     }
+
+    /** Plays a move chosen from the hint analysis. */
+    fun playHintMove(move: Move) = submitPlayerMove(move)
 
     fun clearHint() {
         hintJob?.cancel()
