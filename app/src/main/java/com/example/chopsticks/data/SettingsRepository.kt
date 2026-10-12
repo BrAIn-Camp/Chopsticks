@@ -53,4 +53,11 @@ class SettingsRepository(context: Context) {
     fun saveDifficulty(difficulty: Difficulty) {
         prefs.edit().putString("difficulty", difficulty.name).apply()
     }
+
+    /** The name of the chosen visual theme, or null if none has been picked yet. */
+    fun loadThemeName(): String? = prefs.getString("theme", null)
+
+    fun saveThemeName(name: String) {
+        prefs.edit().putString("theme", name).apply()
+    }
 }

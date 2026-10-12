@@ -11,7 +11,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.HelpOutline
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Settings
@@ -42,6 +41,9 @@ import com.example.chopsticks.domain.model.GameMode
 import com.example.chopsticks.domain.model.RulesetConfig
 import com.example.chopsticks.ui.screens.DynamicBackground
 import com.example.chopsticks.ui.theme.*
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.platform.LocalDensity
 
 @Composable
 fun MainMenu(
@@ -50,10 +52,9 @@ fun MainMenu(
     onThemeChange: (HandTheme) -> Unit,
     onStartGame: (GameMode) -> Unit,
     onGameRules: () -> Unit,
-    onHowToPlay: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val safeTheme = currentTheme ?: HandTheme.AnalogSynth
+    val safeTheme = currentTheme ?: HandTheme.Default
     var gameMode by remember { mutableStateOf(GameMode.PvE) }
     
     val scrollState = rememberScrollState()
@@ -87,7 +88,20 @@ fun MainMenu(
                     modifier = Modifier.size(width = 320.dp * scale, height = 120.dp * scale)
                 )
 
-                // Title Text
+                // Title Text. Its size is fitted to the space it actually has: "sp" text grows with
+                // the system font-size setting and serif themes set wider letters, so scaling by
+                // screen width alone let it overflow its frame on some devices.
+                val titleStyle = LocalTextStyle.current.merge(
+                    TextStyle(fontSize = 40.sp, fontWeight = FontWeight.Black, letterSpacing = 4.sp)
+                )
+                val textMeasurer = rememberTextMeasurer()
+                val density = LocalDensity.current
+                val fit = remember(maxWidth, titleStyle, density) {
+                    val natural = textMeasurer.measure("CHOPSTICKS", titleStyle, maxLines = 1, softWrap = false).size.width
+                    val frame = with(density) { ((32.dp + 3.dp) * (2f * scale) + 8.dp).toPx() }
+                    val available = with(density) { maxWidth.toPx() } - frame
+                    (available / natural).coerceIn(0.1f, 1f)
+                }
                 Box(
                     modifier = Modifier
                         .border(3.dp * scale, safeTheme.primaryColor)
@@ -97,9 +111,7 @@ fun MainMenu(
                     Text(
                         text = "CHOPSTICKS",
                         color = safeTheme.textColor,
-                        fontSize = 40.sp * scale,
-                        fontWeight = FontWeight.Black,
-                        letterSpacing = 4.sp * scale,
+                        style = titleStyle.copy(fontSize = 40.sp * fit, letterSpacing = 4.sp * fit),
                         maxLines = 1,
                         softWrap = false,
                         textAlign = TextAlign.Center
@@ -123,15 +135,7 @@ fun MainMenu(
 
             // Theme Selection
             SectionHeader("VISUAL THEME", safeTheme)
-            LazyRow(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                contentPadding = PaddingValues(vertical = 8.dp)
-            ) {
-                items(HandTheme.allThemes) { theme ->
-                    ThemeCard(theme, safeTheme == theme, safeTheme) { onThemeChange(theme) }
-                }
-            }
+            ThemeCarousel(selected = safeTheme, onThemeChange = onThemeChange)
 
             Spacer(modifier = Modifier.height(48.dp))
 
@@ -174,19 +178,6 @@ fun MainMenu(
                         Text("GAME RULES", fontSize = 13.sp)
                     }
 
-                    OutlinedButton(
-                        onClick = onHowToPlay,
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(56.dp),
-                        shape = RoundedCornerShape(safeTheme.cornerRadius),
-                        border = BorderStroke(1.dp, safeTheme.textColor.copy(alpha = 0.5f)),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = safeTheme.textColor)
-                    ) {
-                        Icon(Icons.AutoMirrored.Rounded.HelpOutline, contentDescription = null, modifier = Modifier.size(20.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("HOW TO PLAY", fontSize = 13.sp)
-                    }
                 }
             }
             
@@ -201,6 +192,7 @@ fun ChopsticksBackground(
     modifier: Modifier = Modifier,
     scale: Float = 1f
 ) {
+    val neonTime = if (theme is HandTheme.NeonRain) rememberNeonTime() else null
     Canvas(modifier = modifier) {
         val width = size.width
         val height = size.height
@@ -208,85 +200,13 @@ fun ChopsticksBackground(
         val centerY = height / 2f
 
         when (theme) {
-            is HandTheme.AnalogSynth -> {
-                // Sleek metallic-black chopsticks
-                val stickBrush = Brush.verticalGradient(
-                    colors = listOf(Color(0xFF333333), Color(0xFF111111), Color(0xFF333333))
-                )
-                
-                // Draw crossed chopsticks
-                listOf(-45f, 45f).forEach { angle ->
-                    withTransform({
-                        rotate(angle, Offset(centerX, centerY))
-                    }) {
-                        // Main stick
-                        drawRoundRect(
-                            brush = stickBrush,
-                            topLeft = Offset(centerX - 100.dp.toPx() * scale, centerY - 6.dp.toPx() * scale),
-                            size = Size(200.dp.toPx() * scale, 12.dp.toPx() * scale),
-                            cornerRadius = CornerRadius(6.dp.toPx() * scale, 6.dp.toPx() * scale)
-                        )
-                        // Neon tips
-                        drawRoundRect(
-                            color = theme.primaryColor,
-                            topLeft = Offset(centerX + 60.dp.toPx() * scale, centerY - 6.dp.toPx() * scale),
-                            size = Size(40.dp.toPx() * scale, 12.dp.toPx() * scale),
-                            cornerRadius = CornerRadius(6.dp.toPx() * scale, 6.dp.toPx() * scale)
-                        )
-                    }
-                }
+            is HandTheme.NeonRain -> drawNeonChopsticks(scale, neonTime?.value ?: 0f)
 
-                // Energy Arc
-                val arcPath = Path().apply {
-                    moveTo(centerX - 20.dp.toPx() * scale, centerY - 30.dp.toPx() * scale)
-                    quadraticTo(centerX, centerY - 60.dp.toPx() * scale, centerX + 20.dp.toPx() * scale, centerY - 30.dp.toPx() * scale)
-                }
-                drawPath(
-                    path = arcPath,
-                    color = theme.primaryColor.copy(alpha = 0.6f),
-                    style = Stroke(width = 3.dp.toPx() * scale, cap = StrokeCap.Round)
-                )
-            }
+            is HandTheme.PaperCutout -> drawPaperChopsticks(scale)
 
-            is HandTheme.PaperCutout -> {
-                // Rough hand-cut texture
-                val brown = Color(0xFF8B4513)
-                
-                listOf(-40f, 50f).forEach { angle ->
-                    withTransform({
-                        rotate(angle, Offset(centerX, centerY))
-                    }) {
-                        val stickPath = Path().apply {
-                            val startX = centerX - 110.dp.toPx() * scale
-                            val endX = centerX + 110.dp.toPx() * scale
-                            val yTop = centerY - 8.dp.toPx() * scale
-                            val yBottom = centerY + 8.dp.toPx() * scale
-                            
-                            moveTo(startX, yTop)
-                            // Add jitter for "hand-cut" look
-                            lineTo(centerX, yTop + 2.dp.toPx() * scale)
-                            lineTo(endX, yTop - 1.dp.toPx() * scale)
-                            lineTo(endX + 2.dp.toPx() * scale, yBottom + 1.dp.toPx() * scale)
-                            lineTo(centerX, yBottom - 2.dp.toPx() * scale)
-                            lineTo(startX - 2.dp.toPx() * scale, yBottom + 2.dp.toPx() * scale)
-                            close()
-                        }
-                        drawPath(path = stickPath, color = brown)
-                    }
-                }
-
-                // Staples/Tape at intersection
-                drawRect(
-                    color = Color.LightGray.copy(alpha = 0.8f),
-                    topLeft = Offset(centerX - 10.dp.toPx() * scale, centerY - 15.dp.toPx() * scale),
-                    size = Size(20.dp.toPx() * scale, 30.dp.toPx() * scale)
-                )
-                drawRect(
-                    color = Color.LightGray.copy(alpha = 0.8f),
-                    topLeft = Offset(centerX - 15.dp.toPx() * scale, centerY - 5.dp.toPx() * scale),
-                    size = Size(30.dp.toPx() * scale, 10.dp.toPx() * scale)
-                )
-            }
+            is HandTheme.Ombromanie -> drawShadowChopsticks(scale)
+            is HandTheme.Marginalia -> drawManuscriptChopsticks(scale)
+            is HandTheme.TerraFirma -> drawTerraChopsticks(scale)
         }
     }
 }
@@ -300,11 +220,10 @@ fun ChopsticksBackground(
 fun MainMenuPreview() {
     MainMenu(
         currentRuleset = RulesetConfig(),
-        currentTheme = HandTheme.AnalogSynth,
+        currentTheme = HandTheme.Default,
         onThemeChange = {},
         onStartGame = { },
-        onGameRules = {},
-        onHowToPlay = {}
+        onGameRules = {}
     )
 }
 
@@ -313,10 +232,9 @@ fun MainMenuPreview() {
 fun MainMenuSmallPreview() {
     MainMenu(
         currentRuleset = RulesetConfig(),
-        currentTheme = HandTheme.AnalogSynth,
+        currentTheme = HandTheme.Default,
         onThemeChange = {},
         onStartGame = { },
-        onGameRules = {},
-        onHowToPlay = {}
+        onGameRules = {}
     )
 }

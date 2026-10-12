@@ -5,6 +5,7 @@ import com.example.chopsticks.domain.model.Hand
 import com.example.chopsticks.domain.model.Player
 import com.example.chopsticks.domain.model.RulesetConfig
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -92,6 +93,24 @@ class RulesEngineTest {
         val suicideNext = RulesEngine.transfer(suicideState, 0, 1, 4)
         assertNull(suicideNext.errorMessage)
         assertTrue(suicideNext.player1.rightHand.isDead(maxFingers = 5))
+    }
+
+    @Test
+    fun `transfer that kills the receiving hand counts as suicide`() {
+        for (overflow in listOf(true, false)) {
+            val state = GameState(
+                player1 = Player("Player 1", leftHand = Hand(3), rightHand = Hand(4)),
+                ruleset = RulesetConfig(overflow = overflow, allowTransfers = true, onlyEvenSplits = false, allowSuicide = false)
+            )
+            // Moving 1 from left to right makes the right hand reach 5 and die: (2, 0)
+            assertFalse("overflow=$overflow", RulesEngine.validateTransfer(state, 0, 1, 1))
+
+            val suicideState = state.copy(ruleset = state.ruleset.copy(allowSuicide = true))
+            val next = RulesEngine.transfer(suicideState, 0, 1, 1)
+            assertNull(next.errorMessage)
+            assertEquals(2, next.player1.leftHand.fingers)
+            assertTrue(next.player1.rightHand.isDead(maxFingers = 5))
+        }
     }
 
     @Test

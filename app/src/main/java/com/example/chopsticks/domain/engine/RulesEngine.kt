@@ -1,6 +1,7 @@
 package com.example.chopsticks.domain.engine
 
 import com.example.chopsticks.domain.ai.Move
+import com.example.chopsticks.domain.model.DrawReason
 import com.example.chopsticks.domain.model.GameState
 import com.example.chopsticks.domain.model.Hand
 import com.example.chopsticks.domain.model.Player
@@ -123,6 +124,61 @@ object RulesEngine {
     }
 
     /**
+     * Executes any move. The move must already be valid.
+     */
+    fun applyMove(state: GameState, move: Move): GameState {
+        return when (move) {
+            is Move.Attack -> attack(state, move.fromHandIndex, move.toHandIndex)
+            is Move.Transfer -> transfer(state, move.fromHandIndex, move.toHandIndex, move.amount)
+            is Move.ExchangeLife -> exchangeLife(state, move.sacrificedHandIndex)
+            is Move.Condense -> condense(state, move.leftFingers, move.rightFingers)
+        }
+    }
+
+    /**
+     * Every legal move for the player whose turn it is.
+     */
+    fun legalMoves(state: GameState): List<Move> {
+        val moves = mutableListOf<Move>()
+        val playerId = state.currentPlayerId
+        val currentPlayer = state.getCurrentPlayer()
+
+        for (from in 0..1) {
+            for (to in 0..1) {
+                moves.add(Move.Attack(playerId, from, to))
+            }
+        }
+        for (from in 0..1) {
+            val fromHand = if (from == 0) currentPlayer.leftHand else currentPlayer.rightHand
+            for (amount in 1..fromHand.fingers) {
+                moves.add(Move.Transfer(playerId, from, 1 - from, amount))
+            }
+        }
+        for (sacrificed in 0..1) {
+            moves.add(Move.ExchangeLife(playerId, sacrificed))
+        }
+        val remainder = currentPlayer.leftHand.fingers + currentPlayer.rightHand.fingers - state.ruleset.maxFingers
+        for (left in 0..remainder) {
+            moves.add(Move.Condense(playerId, left, remainder - left))
+        }
+
+        return moves.filter { validateMove(state, it) }
+    }
+
+    /**
+     * Checks whether the game should end in a draw now that it is [GameState.currentPlayerId]'s turn.
+     * @param timesPositionSeen how many times this exact position has occurred, including now.
+     */
+    fun detectDraw(state: GameState, timesPositionSeen: Int): DrawReason? {
+        if (state.isGameOver) return null
+        if (timesPositionSeen >= REPETITION_LIMIT) return DrawReason.REPETITION
+        if (legalMoves(state).isEmpty()) return DrawReason.NO_LEGAL_MOVES
+        return null
+    }
+
+    const val REPETITION_LIMIT = 3
+
+    /**
      * Validates if a move is legal without executing it.
      */
     fun validateMove(state: GameState, move: Move): Boolean {
@@ -192,7 +248,7 @@ object RulesEngine {
      * Validates if an attack is legal without executing it.
      */
     fun validateAttack(state: GameState, fromHandIndex: Int, toHandIndex: Int): Boolean {
-        if (state.winnerId != null) return false
+        if (state.isGameOver) return false
         val currentPlayer = state.getCurrentPlayer()
         val opponent = state.getOpponentPlayer()
         val attackerHand = if (fromHandIndex == 0) currentPlayer.leftHand else currentPlayer.rightHand
@@ -212,7 +268,7 @@ object RulesEngine {
      * Validates if a transfer is legal without executing it.
      */
     fun validateTransfer(state: GameState, fromHandIndex: Int, toHandIndex: Int, amount: Int): Boolean {
-        if (state.winnerId != null) return false
+        if (state.isGameOver) return false
         if (fromHandIndex == toHandIndex) return false
         val currentPlayer = state.getCurrentPlayer()
         val fromHand = if (fromHandIndex == 0) currentPlayer.leftHand else currentPlayer.rightHand
@@ -244,8 +300,9 @@ object RulesEngine {
             newToFingers = 0
         }
 
-        val newFromHand = Hand(newFromFingers)
-        if (newFromHand.isDead(maxFingers, exactFive) && !state.ruleset.allowSuicide) return false
+        // Suicide: emptying the giving hand, or pushing the receiving hand to the limit, kills your own hand
+        val killsOwnHand = Hand(newFromFingers).isDead(maxFingers, exactFive) || Hand(newToFingers).isDead(maxFingers, exactFive)
+        if (killsOwnHand && !state.ruleset.allowSuicide) return false
         if (exactFive && newToFingers > maxFingers) return false
 
         // Wikipedia Identity/Swap Rule: Forbids moves that just swap hand values or keep them identical.
@@ -264,7 +321,7 @@ object RulesEngine {
 
     fun validateExchangeLife(state: GameState, sacrificedHandIndex: Int): Boolean {
         if (!state.ruleset.allowExchangeLife) return false
-        if (state.winnerId != null) return false
+        if (state.isGameOver) return false
 
         val player = state.getCurrentPlayer()
         val maxFingers = state.ruleset.maxFingers
@@ -282,7 +339,7 @@ object RulesEngine {
 
     fun validateCondense(state: GameState, leftFingers: Int, rightFingers: Int): Boolean {
         if (!state.ruleset.allowCondense) return false
-        if (state.winnerId != null) return false
+        if (state.isGameOver) return false
 
         val player = state.getCurrentPlayer()
         val maxFingers = state.ruleset.maxFingers

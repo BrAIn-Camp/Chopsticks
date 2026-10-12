@@ -1,6 +1,7 @@
 package com.example.chopsticks.ui.theme
 
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
@@ -14,43 +15,93 @@ sealed class HandTheme(
     val textColor: Color,
     val cornerRadius: Dp = 0.dp,
     val organicEdges: Boolean = false,
-    val plasticTexture: Boolean = false,
-    val isDark: Boolean = true
+    val isDark: Boolean = true,
+    /** The typeface for this theme's text. */
+    val typeface: FontFamily = FontFamily.Monospace
 ) {
-    object AnalogSynth : HandTheme(
-        name = "Analog Synth",
-        backgroundColor = Color(0xFF1A1A1A),
-        primaryColor = Color(0xFFFFCC00),
-        secondaryColor = Color(0xFF333333),
-        handColor = Color(0xFF444444),
-        fingerColor = Color(0xFFFF3300),
-        textColor = Color(0xFFEEEEEE),
-        cornerRadius = 8.dp,
-        plasticTexture = true
+    /** A rain-soaked megacity at night, cyberpunk after its sources. See NeonRain.kt. */
+    object NeonRain : HandTheme(
+        name = "Neon Rain",
+        backgroundColor = Color(0xFF06070D),
+        primaryColor = Color(0xFFE3131B),
+        secondaryColor = Color(0xFF1A1F2A),
+        handColor = Color(0xFF262B36),
+        fingerColor = Color(0xFF262B36),
+        textColor = Color(0xFFE8ECF2),
+        cornerRadius = 0.dp
     )
 
+    /** Paper sprites on a cardboard stage. See PaperStage.kt. */
     object PaperCutout : HandTheme(
         name = "Paper Cutout",
-        backgroundColor = Color(0xFFE8E0D5),
-        primaryColor = Color(0xFF8B4513),
-        secondaryColor = Color(0xFFD2B48C),
-        handColor = Color(0xFF5D4037),
-        fingerColor = Color(0xFF795548),
-        textColor = Color(0xFF3E2723),
+        backgroundColor = Color(0xFFF7F1E3),
+        primaryColor = Color(0xFFE2412F),
+        secondaryColor = Color(0xFFF6C443),
+        handColor = Color(0xFFFFFFFF),
+        fingerColor = Color(0xFFFFFFFF),
+        textColor = Color(0xFF2A2838),
+        cornerRadius = 16.dp,
+        isDark = false,
+        typeface = FontFamily.SansSerif
+    )
+
+    /** Hand shadows on a lamp-lit screen. See ShadowTheatre.kt. */
+    object Ombromanie : HandTheme(
+        name = "Ombromanie",
+        backgroundColor = Color(0xFFEFD9A9),
+        primaryColor = Color(0xFF7E1A16),
+        secondaryColor = Color(0xFFD9A25F),
+        handColor = Color(0xFF15100E),
+        fingerColor = Color(0xFF15100E),
+        textColor = Color(0xFF22140F),
+        cornerRadius = 0.dp,
+        isDark = false,
+        typeface = FontFamily.Serif
+    )
+
+    /** A page of a medieval manuscript. See Manuscript.kt. */
+    object Marginalia : HandTheme(
+        name = "Marginalia",
+        backgroundColor = Color(0xFFEFE2C4),
+        primaryColor = Color(0xFF22408F),
+        secondaryColor = Color(0xFFC9A13B),
+        handColor = Color(0xFF2B1C12),
+        fingerColor = Color(0xFF2B1C12),
+        textColor = Color(0xFF2B1C12),
+        cornerRadius = 0.dp,
+        isDark = false,
+        typeface = FontFamily.Serif
+    )
+
+    /** A pixel-art sandbox world, after Terraria. See TerraFirma.kt. */
+    object TerraFirma : HandTheme(
+        name = "Terra Firma",
+        backgroundColor = Color(0xFF1E2350),
+        primaryColor = Color(0xFFFFD452),
+        secondaryColor = Color(0xFF3F45A0),
+        handColor = Color(0xFFE7A47A),
+        fingerColor = Color(0xFFE7A47A),
+        textColor = Color(0xFFF2F2F2),
         cornerRadius = 4.dp,
-        organicEdges = true,
-        isDark = false
+        isDark = true,
+        typeface = FontFamily.Monospace
     )
 
     companion object {
         /**
          * Returns all available themes. We use a getter to ensure that the objects
-         * (AnalogSynth, PaperCutout) are fully initialized before being collected into a list.
+         * (e.g. PaperCutout) are fully initialized before being collected into a list.
          */
         val allThemes: List<HandTheme>
             get() = listOfNotNull(
-                AnalogSynth,
-                PaperCutout
+                Ombromanie,
+                PaperCutout,
+                TerraFirma,
+                Marginalia,
+                NeonRain
             )
+
+        /** The theme new players start with. */
+        val Default: HandTheme get() = Ombromanie
     }
 }
