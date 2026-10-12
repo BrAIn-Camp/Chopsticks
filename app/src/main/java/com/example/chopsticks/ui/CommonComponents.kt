@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.style.TextAlign
 import com.example.chopsticks.ui.theme.HandTheme
+import com.example.chopsticks.ui.theme.NeonButton
 import com.example.chopsticks.ui.theme.PaperPillButton
 import com.example.chopsticks.ui.theme.RubricButton
 import com.example.chopsticks.ui.theme.TerraPanelButton
@@ -159,60 +160,8 @@ fun ArtisticActionButton(
         label = "button_alpha"
     )
 
-    if (theme is HandTheme.AnalogSynth) {
-        val infiniteTransition = rememberInfiniteTransition(label = "led_glow")
-        val alphaGlow by infiniteTransition.animateFloat(
-            initialValue = 0.4f,
-            targetValue = 1.0f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(800, easing = LinearEasing),
-                repeatMode = RepeatMode.Reverse
-            ),
-            label = "led_glow_alpha"
-        )
-        
-        Box(
-            modifier = modifier
-                .height(48.dp)
-                .graphicsLayer { alpha = buttonAlpha }
-                .clip(RoundedCornerShape(8.dp))
-                .background(Color(0xFF252525))
-                .border(
-                    width = 2.dp,
-                    color = theme.primaryColor.copy(alpha = if (enabled) 0.8f else 0.3f),
-                    shape = RoundedCornerShape(8.dp)
-                )
-                .clickable(enabled = enabled) { onClick() }
-                .padding(horizontal = 16.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center
-            ) {
-                val ledColor = if (enabled) theme.fingerColor else Color.Gray
-                Box(contentAlignment = Alignment.Center, modifier = Modifier.width(16.dp).height(16.dp)) {
-                    if (enabled) {
-                        Box(
-                            modifier = Modifier.width(16.dp).height(16.dp)
-                                .background(ledColor.copy(alpha = 0.3f * alphaGlow), shape = CircleShape)
-                        )
-                    }
-                    Box(
-                        modifier = Modifier.width(8.dp).height(8.dp)
-                            .background(ledColor, shape = CircleShape)
-                    )
-                }
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = text.uppercase(),
-                    color = if (enabled) theme.textColor else Color.Gray,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 1.sp
-                )
-            }
-        }
+    if (theme is HandTheme.NeonRain) {
+        NeonButton(text, onClick, modifier, enabled, buttonAlpha)
     } else if (theme is HandTheme.Ombromanie) {
         ShadowTicketButton(text, onClick, modifier, enabled, buttonAlpha)
     } else if (theme is HandTheme.Marginalia) {

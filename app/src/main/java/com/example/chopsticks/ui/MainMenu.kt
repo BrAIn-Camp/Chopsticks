@@ -201,6 +201,7 @@ fun ChopsticksBackground(
     modifier: Modifier = Modifier,
     scale: Float = 1f
 ) {
+    val neonTime = if (theme is HandTheme.NeonRain) rememberNeonTime() else null
     Canvas(modifier = modifier) {
         val width = size.width
         val height = size.height
@@ -208,45 +209,7 @@ fun ChopsticksBackground(
         val centerY = height / 2f
 
         when (theme) {
-            is HandTheme.AnalogSynth -> {
-                // Sleek metallic-black chopsticks
-                val stickBrush = Brush.verticalGradient(
-                    colors = listOf(Color(0xFF333333), Color(0xFF111111), Color(0xFF333333))
-                )
-                
-                // Draw crossed chopsticks
-                listOf(-45f, 45f).forEach { angle ->
-                    withTransform({
-                        rotate(angle, Offset(centerX, centerY))
-                    }) {
-                        // Main stick
-                        drawRoundRect(
-                            brush = stickBrush,
-                            topLeft = Offset(centerX - 100.dp.toPx() * scale, centerY - 6.dp.toPx() * scale),
-                            size = Size(200.dp.toPx() * scale, 12.dp.toPx() * scale),
-                            cornerRadius = CornerRadius(6.dp.toPx() * scale, 6.dp.toPx() * scale)
-                        )
-                        // Neon tips
-                        drawRoundRect(
-                            color = theme.primaryColor,
-                            topLeft = Offset(centerX + 60.dp.toPx() * scale, centerY - 6.dp.toPx() * scale),
-                            size = Size(40.dp.toPx() * scale, 12.dp.toPx() * scale),
-                            cornerRadius = CornerRadius(6.dp.toPx() * scale, 6.dp.toPx() * scale)
-                        )
-                    }
-                }
-
-                // Energy Arc
-                val arcPath = Path().apply {
-                    moveTo(centerX - 20.dp.toPx() * scale, centerY - 30.dp.toPx() * scale)
-                    quadraticTo(centerX, centerY - 60.dp.toPx() * scale, centerX + 20.dp.toPx() * scale, centerY - 30.dp.toPx() * scale)
-                }
-                drawPath(
-                    path = arcPath,
-                    color = theme.primaryColor.copy(alpha = 0.6f),
-                    style = Stroke(width = 3.dp.toPx() * scale, cap = StrokeCap.Round)
-                )
-            }
+            is HandTheme.NeonRain -> drawNeonChopsticks(scale, neonTime?.value ?: 0f)
 
             is HandTheme.PaperCutout -> drawPaperChopsticks(scale)
 
@@ -266,7 +229,7 @@ fun ChopsticksBackground(
 fun MainMenuPreview() {
     MainMenu(
         currentRuleset = RulesetConfig(),
-        currentTheme = HandTheme.AnalogSynth,
+        currentTheme = HandTheme.Default,
         onThemeChange = {},
         onStartGame = { },
         onGameRules = {},
@@ -279,7 +242,7 @@ fun MainMenuPreview() {
 fun MainMenuSmallPreview() {
     MainMenu(
         currentRuleset = RulesetConfig(),
-        currentTheme = HandTheme.AnalogSynth,
+        currentTheme = HandTheme.Default,
         onThemeChange = {},
         onStartGame = { },
         onGameRules = {},

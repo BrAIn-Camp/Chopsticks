@@ -55,7 +55,11 @@ fun ThemedHand(
 
     val activeAlpha by animateFloatAsState(
         // Paper sprites and inventory slots barely dim: spotlights / slot highlights show whose turn it is
-        targetValue = if (isActive) 1f else if (theme is HandTheme.PaperCutout || theme is HandTheme.TerraFirma) 0.82f else 0.4f,
+        targetValue = if (isActive) 1f else when (theme) {
+            is HandTheme.PaperCutout, is HandTheme.TerraFirma -> 0.82f
+            is HandTheme.NeonRain -> 0.7f   // powered down: its joints and sensor dim on their own
+            else -> 0.4f
+        },
         animationSpec = tween(500),
         label = "active_alpha"
     )
@@ -101,6 +105,12 @@ fun ThemedHand(
                     val w = size.width
                     val h = size.height
                     val jitter = if (theme.organicEdges) 4f else 0f
+
+                    if (isDead && theme is HandTheme.NeonRain) {
+                        val deadRect = Rect(Offset(w * 0.14f, h * 0.48f), Size(w * 0.72f, h * 0.48f))
+                        drawFlatline(deadRect, isLeftHand, h, pulse, textMeasurer)
+                        return@onDrawWithContent
+                    }
 
                     if (isDead && theme is HandTheme.TerraFirma) {
                         drawPixelated(pixelBuffer, terraPixel()) {
@@ -165,36 +175,8 @@ fun ThemedHand(
                     }
                     
                     when (theme) {
-                        is HandTheme.AnalogSynth -> {
-                            val plateBrush = Brush.linearGradient(
-                                colors = listOf(theme.handColor, theme.handColor.copy(alpha = 0.85f)),
-                                start = Offset(palmRect.left, palmRect.top),
-                                end = Offset(palmRect.right, palmRect.bottom)
-                            )
-                            drawPath(palmPath, plateBrush)
-                            drawPath(palmPath, theme.secondaryColor.copy(alpha = 0.3f), style = Stroke(2.dp.toPx()))
-                            
-                            val gridPath = Path()
-                            for (gx in 0..palmRect.width.toInt() step 40) {
-                                gridPath.moveTo(palmRect.left + gx, palmRect.top + 20.dp.toPx())
-                                gridPath.lineTo(palmRect.left + gx, palmRect.bottom - 10.dp.toPx())
-                            }
-                            for (gy in 0..palmRect.height.toInt() step 40) {
-                                gridPath.moveTo(palmRect.left + 10.dp.toPx(), palmRect.top + gy)
-                                gridPath.lineTo(palmRect.right - 10.dp.toPx(), palmRect.top + gy)
-                            }
-                            drawPath(gridPath, theme.secondaryColor.copy(alpha = 0.4f), style = Stroke(1.dp.toPx()))
-
-                            // OSCILLOSCOPE: Flat if not active
-                            val oscPath = Path()
-                            val amplitude = if (isActive) 25.dp.toPx() else 0f
-                            for (x in 0..palmRect.width.toInt() step 5) {
-                                val y = sin((x + pulse * 600) * 0.08f) * amplitude
-                                if (x == 0) oscPath.moveTo(palmRect.left + x, palmRect.center.y + y)
-                                else oscPath.lineTo(palmRect.left + x, palmRect.center.y + y)
-                            }
-                            drawPath(oscPath, theme.primaryColor, style = Stroke(4.dp.toPx()))
-                        }
+                        // Drawn whole as a cybernetic hand once the fingers are laid out, below
+                        is HandTheme.NeonRain -> Unit
                         // Drawn as a whole glove once the fingers are laid out, below
                         is HandTheme.PaperCutout -> Unit
                         // Drawn as pixel art inside its slot once the fingers are laid out, below
@@ -299,6 +281,11 @@ fun ThemedHand(
                         return@onDrawWithContent
                     }
 
+                    if (theme is HandTheme.NeonRain) {
+                        drawCyberHand(palmRect, isLeftHand, h, fingerBases, fingerAngles, fingerLengths, fingerWidths, activeIndices, fingers, isActive, pulse, textMeasurer)
+                        return@onDrawWithContent
+                    }
+
                     if (theme is HandTheme.PaperCutout) {
                         drawPaperGlove(palmRect, isLeftHand, fingerBases, fingerAngles, fingerLengths, fingerWidths, activeIndices, fingers, textMeasurer)
                         return@onDrawWithContent
@@ -317,27 +304,6 @@ fun ThemedHand(
                             jitter = jitter
                         )
 
-                        // --- THEME ADAPTATION OVERLAYS ---
-                        if (theme is HandTheme.AnalogSynth) {
-                            val fx = fingerBases[i].x
-                            val fy = fingerBases[i].y - fingerLengths[i] * 0.6f
-                            val cable = Path().apply {
-                                moveTo(palmRect.center.x, palmRect.center.y)
-                                cubicTo(
-                                    palmRect.center.x - 30.dp.toPx(), palmRect.top - 20.dp.toPx(),
-                                    fx + 20.dp.toPx(), palmRect.top - 40.dp.toPx(),
-                                    fx, fy
-                                )
-                            }
-                            drawPath(cable, theme.primaryColor, style = Stroke(4.dp.toPx(), cap = StrokeCap.Round))
-                            
-                            val lightColor = if (pulse > 0.5f) theme.primaryColor else theme.secondaryColor
-                            val tipPos = fingerBases[i] + Offset(
-                                (sin(Math.toRadians(fingerAngles[i].toDouble())) * -fingerLengths[i]).toFloat(),
-                                (-Math.cos(Math.toRadians(fingerAngles[i].toDouble())) * fingerLengths[i]).toFloat()
-                            )
-                            drawCircle(lightColor, 6.dp.toPx(), tipPos + Offset(0f, 10.dp.toPx()))
-                        }
                     }
                 }
             }
@@ -439,17 +405,8 @@ private fun DrawScope.drawAnatomicalFinger(
             val segRect = Rect(Offset(currentBase.x - segW/2, currentBase.y - segLength), Size(segW, segLength))
             
             when (theme) {
-                is HandTheme.AnalogSynth -> {
-                    val plateBrush = Brush.verticalGradient(
-                        colors = listOf(theme.fingerColor.copy(alpha=0.9f), theme.fingerColor),
-                        startY = segRect.bottom,
-                        endY = segRect.top
-                    )
-                    drawPath(finalPath, plateBrush)
-                    // Ball-and-socket joint
-                    drawCircle(theme.secondaryColor, radius = segW * 0.45f, center = currentBase)
-                    drawCircle(Color.White.copy(alpha=0.25f), radius = segW * 0.2f, center = currentBase - Offset(2.dp.toPx(), 2.dp.toPx()))
-                }
+                // Drawn whole by drawCyberHand
+                is HandTheme.NeonRain -> Unit
                 // The glove is drawn whole by drawPaperGlove, never segment by segment
                 is HandTheme.PaperCutout -> Unit
                 is HandTheme.TerraFirma -> Unit

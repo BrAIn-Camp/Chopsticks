@@ -121,33 +121,7 @@ fun DrawScope.drawMovePath(
     val currentEnd = start + dir * progress
     
     when (theme) {
-        is HandTheme.AnalogSynth -> {
-            val color = theme.primaryColor
-            val controlPoint = start + dir * 0.5f + ortho * 80.dp.toPx()
-            
-            val fullPath = Path().apply {
-                moveTo(start.x, start.y)
-                quadraticTo(controlPoint.x, controlPoint.y, end.x, end.y)
-            }
-            drawPath(fullPath, color.copy(alpha = 0.35f), style = Stroke(width = 14.dp.toPx(), cap = StrokeCap.Round))
-            
-            val partialPath = Path().apply {
-                moveTo(start.x, start.y)
-                val steps = 30
-                for (i in 1..(steps * progress).toInt()) {
-                    val t = i.toFloat() / steps
-                    val p = start * ((1 - t) * (1 - t)) + controlPoint * (2 * (1 - t) * t) + end * (t * t)
-                    lineTo(p.x, p.y)
-                }
-            }
-            drawPath(partialPath, color, style = Stroke(width = 12.dp.toPx(), cap = StrokeCap.Round))
-            
-            val pulseT = progress
-            val pulsePos = start * ((1 - pulseT) * (1 - pulseT)) + controlPoint * (2 * (1 - pulseT) * pulseT) + end * (pulseT * pulseT)
-            drawCircle(color = Color.White, radius = 10.dp.toPx(), center = pulsePos)
-            drawCircle(color = theme.secondaryColor, radius = 18.dp.toPx(), center = pulsePos, style = Stroke(4.dp.toPx()))
-            drawCircle(color = Color.White.copy(alpha = 0.5f), radius = 24.dp.toPx() * progress, center = pulsePos)
-        }
+        is HandTheme.NeonRain -> drawNetrunTrace(start, end, progress)
         is HandTheme.PaperCutout -> drawPaperPlaneMove(start, end, progress)
         is HandTheme.Ombromanie -> drawShadowMovePath(start, end, progress)
         is HandTheme.Marginalia -> drawPenFlourish(start, end, progress)

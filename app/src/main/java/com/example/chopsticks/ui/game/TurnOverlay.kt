@@ -71,11 +71,18 @@ fun ThemeTurnOverlay(
     val sway = if (theme is HandTheme.PaperCutout) rememberPaperSway() else null
     val terraTime = if (theme is HandTheme.TerraFirma) rememberTerraTime() else null
     val terraBuffer = remember { PixelBuffer() }
+    val neonTime = if (theme is HandTheme.NeonRain) rememberNeonTime() else null
+    val textMeasurer = rememberTextMeasurer()
 
     Canvas(modifier = Modifier.fillMaxSize()) {
         when (theme) {
-            is HandTheme.AnalogSynth -> {
-                drawAnalogSynthTurn(p1Area, p1Progress, p2Area, p2Progress, theme)
+            is HandTheme.NeonRain -> {
+                val time = neonTime?.value ?: 0f
+                drawNeonCity(time, textMeasurer)
+                // Targeting brackets lock onto whoever's turn it is
+                val p2Label = if (gameMode == GameMode.PvE) "> AI_LINK // ACTIVE" else "> P2_LINK // ACTIVE"
+                p1Area?.let { drawNeonTarget(it, p1Progress, time, textMeasurer, "> P1_LINK // ACTIVE") }
+                p2Area?.let { drawNeonTarget(it, p2Progress, time, textMeasurer, p2Label) }
             }
             is HandTheme.PaperCutout -> {
                 // Spotlights swing onto the active player; the audience hops as the turn changes
@@ -124,110 +131,6 @@ fun ThemeTurnOverlay(
     }
 }
 
-private fun DrawScope.drawAnalogSynthTurn(
-    p1Area: Rect?,
-    p1Progress: Float,
-    p2Area: Rect?,
-    p2Progress: Float,
-    theme: HandTheme
-) {
-    val glowColor = theme.primaryColor
-    val cableColor = theme.fingerColor
-    
-    // P1 Frame
-    p1Area?.let { rect ->
-        drawPowerFrame(rect, p1Progress, glowColor)
-        drawEnergyCable(rect, p1Progress, cableColor, isTop = false)
-    }
-    
-    // P2 Frame
-    p2Area?.let { rect ->
-        drawPowerFrame(rect, p2Progress, glowColor)
-        drawEnergyCable(rect, p2Progress, cableColor, isTop = true)
-    }
-}
-
-private fun DrawScope.drawPowerFrame(rect: Rect, progress: Float, color: Color) {
-    if (progress <= 0f) return
-    val alpha = progress
-    val stroke = 2.dp.toPx()
-    val cornerLen = 24.dp.toPx()
-    
-    // Main frame lines (pulsing)
-    drawRect(
-        color = color.copy(alpha = 0.2f * alpha),
-        topLeft = rect.topLeft,
-        size = rect.size,
-        style = Stroke(width = stroke)
-    )
-    
-    // Sharp Corners
-    val corners = listOf(
-        rect.topLeft to Offset(1f, 1f),
-        rect.topRight to Offset(-1f, 1f),
-        rect.bottomLeft to Offset(1f, -1f),
-        rect.bottomRight to Offset(-1f, -1f)
-    )
-    
-    corners.forEach { (pos, dir) ->
-        drawLine(
-            color = color.copy(alpha = alpha),
-            start = pos,
-            end = pos + Offset(dir.x * cornerLen, 0f),
-            strokeWidth = stroke * 2
-        )
-        drawLine(
-            color = color.copy(alpha = alpha),
-            start = pos,
-            end = pos + Offset(0f, dir.y * cornerLen),
-            strokeWidth = stroke * 2
-        )
-    }
-}
-
-private fun DrawScope.drawEnergyCable(rect: Rect, progress: Float, color: Color, isTop: Boolean) {
-    if (progress <= 0.1f) return
-    
-    val startX = if (isTop) size.width else 0f
-    val startY = if (isTop) rect.top else rect.bottom
-    val start = Offset(startX, startY)
-    val end = rect.center
-    
-    val ctrl1 = Offset(startX + (if (isTop) -100.dp.toPx() else 100.dp.toPx()), startY)
-    val ctrl2 = Offset(end.x, startY)
-    
-    val path = Path().apply {
-        moveTo(start.x, start.y)
-        cubicTo(ctrl1.x, ctrl1.y, ctrl2.x, ctrl2.y, end.x, end.y)
-    }
-    
-    // Draw thick neon cable
-    drawPath(
-        path = path,
-        color = color.copy(alpha = 0.3f * progress),
-        style = Stroke(width = 12.dp.toPx(), cap = StrokeCap.Round)
-    )
-    
-    // Pulsing core
-    val pathMeasure = PathMeasure()
-    pathMeasure.setPath(path, false)
-    val length = pathMeasure.length
-    val partialPath = Path()
-    pathMeasure.getSegment(0f, length * progress, partialPath, true)
-    
-    drawPath(
-        path = partialPath,
-        color = color.copy(alpha = progress),
-        style = Stroke(width = 6.dp.toPx(), cap = StrokeCap.Round)
-    )
-    
-    // Energy pulses
-    val time = System.currentTimeMillis() / 500f
-    val pulsePos = (time % 1f) * length * progress
-    val pos = pathMeasure.getPosition(pulsePos)
-    drawCircle(Color.White, radius = 4.dp.toPx(), center = pos)
-}
-
 @Composable
 private fun ComputerThinkingStatus(p2Area: Rect?, theme: HandTheme) {
     if (p2Area == null) return
@@ -240,6 +143,28 @@ private fun ComputerThinkingStatus(p2Area: Rect?, theme: HandTheme) {
             modifier = Modifier.graphicsLayer {
                 translationX = p2Area.center.x - 110.dp.toPx()
                 translationY = p2Area.bottom + 2.dp.toPx()
+            }
+        )
+        return
+    }
+
+    if (theme is HandTheme.NeonRain) {
+        // A terminal line with a blinking cursor, just below the computer's hands
+        val cursor by rememberInfiniteTransition(label = "cursor").animateFloat(
+            initialValue = 0f, targetValue = 1f,
+            animationSpec = infiniteRepeatable(tween(1000, easing = LinearEasing), RepeatMode.Restart),
+            label = "blink"
+        )
+        Text(
+            "> AI JACKING IN" + if (cursor < 0.5f) "_" else " ",
+            color = NeonInk.Cyan,
+            fontSize = 12.sp,
+            fontFamily = FontFamily.Monospace,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 2.sp,
+            modifier = Modifier.graphicsLayer {
+                translationX = p2Area.center.x - 80.dp.toPx()
+                translationY = p2Area.bottom + 4.dp.toPx()
             }
         )
         return
@@ -275,14 +200,7 @@ private fun ComputerThinkingStatus(p2Area: Rect?, theme: HandTheme) {
                 translationY = p2Area.top - 40.dp.toPx()
                 this.alpha = alpha
             }
-            .let {
-                if (theme is HandTheme.AnalogSynth) {
-                    it.border(1.dp, theme.primaryColor, RoundedCornerShape(4.dp))
-                        .background(Color.Black.copy(alpha = 0.8f))
-                } else {
-                    it.background(theme.secondaryColor, RoundedCornerShape(2.dp))
-                }
-            }
+            .background(theme.secondaryColor, RoundedCornerShape(2.dp))
             .padding(horizontal = 8.dp, vertical = 4.dp)
     ) {
         if (theme is HandTheme.Ombromanie || theme is HandTheme.Marginalia) {

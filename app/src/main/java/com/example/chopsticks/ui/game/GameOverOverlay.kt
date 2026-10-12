@@ -51,72 +51,22 @@ fun GameOverOverlay(
             .padding(24.dp),
         contentAlignment = Alignment.Center
     ) {
-        if (theme is HandTheme.AnalogSynth) {
-            // Digital glitch overlay
-            val infiniteTransition = rememberInfiniteTransition(label = "glitch")
-            val glitchOffset by infiniteTransition.animateFloat(
-                initialValue = -4f,
-                targetValue = 4f,
-                animationSpec = infiniteRepeatable(
-                    animation = tween(150, easing = LinearEasing),
-                    repeatMode = RepeatMode.Reverse
-                ),
-                label = "glitch_offset"
-            )
-            val message = when (winner) {
-                null -> "SIGNAL DEADLOCK"
-                "Player 1" -> "VICTORY ACHIEVED"
-                else -> "SYSTEM SHUTDOWN"
+        if (theme is HandTheme.NeonRain) {
+            val playerLostToComputer = gameMode == GameMode.PvE && winner == "Player 2"
+            val headline = when {
+                winner == null -> "CONNECTION LOST"
+                playerLostToComputer -> "FLATLINED"
+                gameMode == GameMode.PvE -> "ICE BROKEN"
+                else -> (if (winner == "Player 1") "PLAYER 2" else "PLAYER 1") + " FLATLINED"
             }
-
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
-            ) {
-                Box {
-                    Text(
-                        text = message,
-                        color = Color.Cyan.copy(alpha = 0.7f),
-                        fontSize = 32.sp,
-                        fontWeight = FontWeight.Black,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.offset(x = glitchOffset.dp)
-                    )
-                    Text(
-                        text = message,
-                        color = Color.Magenta.copy(alpha = 0.7f),
-                        fontSize = 32.sp,
-                        fontWeight = FontWeight.Black,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.offset(x = (-glitchOffset).dp, y = (glitchOffset / 2).dp)
-                    )
-                    Text(
-                        text = message,
-                        color = theme.primaryColor,
-                        fontSize = 32.sp,
-                        fontWeight = FontWeight.Black,
-                        textAlign = TextAlign.Center
-                    )
-                }
-                
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                Text(
-                    text = resultText(state),
-                    color = theme.textColor.copy(alpha = 0.8f),
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Medium,
-                    letterSpacing = 2.sp
-                )
-
-                Spacer(modifier = Modifier.height(48.dp))
-
-                ArtisticActionButton(
-                    text = "TRY AGAIN",
-                    onClick = onRestart,
-                    theme = theme,
-                    modifier = Modifier.width(200.dp)
-                )
+            val subtitle = when {
+                winner == null -> "// neither runner got through"
+                playerLostToComputer -> "// the AI burned you out"
+                gameMode == GameMode.PvE -> "// you're in. the AI flatlined"
+                else -> "// one runner left standing"
+            }
+            NeonEndScreen(headline, resultText(state), subtitle) {
+                ArtisticActionButton(text = "Jack in again", onClick = onRestart, theme = theme)
             }
         } else if (theme is HandTheme.Ombromanie) {
             ShadowIntertitle(

@@ -290,6 +290,6 @@ fun ConfigurationScreenPreview() {
         onDifficultyChange = {},
         onRestoreDefaults = {},
         onBack = {},
-        theme = HandTheme.AnalogSynth
+        theme = HandTheme.Default
     )
 }

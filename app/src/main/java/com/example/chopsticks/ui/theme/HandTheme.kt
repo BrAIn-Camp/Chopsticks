@@ -15,21 +15,20 @@ sealed class HandTheme(
     val textColor: Color,
     val cornerRadius: Dp = 0.dp,
     val organicEdges: Boolean = false,
-    val plasticTexture: Boolean = false,
     val isDark: Boolean = true,
     /** The typeface for this theme's text. */
     val typeface: FontFamily = FontFamily.Monospace
 ) {
-    object AnalogSynth : HandTheme(
-        name = "Analog Synth",
-        backgroundColor = Color(0xFF1A1A1A),
-        primaryColor = Color(0xFFFFCC00),
-        secondaryColor = Color(0xFF333333),
-        handColor = Color(0xFF444444),
-        fingerColor = Color(0xFFFF3300),
-        textColor = Color(0xFFEEEEEE),
-        cornerRadius = 8.dp,
-        plasticTexture = true
+    /** A rain-soaked megacity at night, cyberpunk after its sources. See NeonRain.kt. */
+    object NeonRain : HandTheme(
+        name = "Neon Rain",
+        backgroundColor = Color(0xFF06070D),
+        primaryColor = Color(0xFFE3131B),
+        secondaryColor = Color(0xFF1A1F2A),
+        handColor = Color(0xFF262B36),
+        fingerColor = Color(0xFF262B36),
+        textColor = Color(0xFFE8ECF2),
+        cornerRadius = 0.dp
     )
 
     /** Paper sprites on a cardboard stage. See PaperStage.kt. */
@@ -91,7 +90,7 @@ sealed class HandTheme(
     companion object {
         /**
          * Returns all available themes. We use a getter to ensure that the objects
-         * (AnalogSynth, PaperCutout) are fully initialized before being collected into a list.
+         * (e.g. PaperCutout) are fully initialized before being collected into a list.
          */
         val allThemes: List<HandTheme>
             get() = listOfNotNull(
@@ -99,7 +98,7 @@ sealed class HandTheme(
                 PaperCutout,
                 TerraFirma,
                 Marginalia,
-                AnalogSynth
+                NeonRain
             )
 
         /** The theme new players start with. */
