@@ -244,8 +244,9 @@ object RulesEngine {
             newToFingers = 0
         }
 
-        val newFromHand = Hand(newFromFingers)
-        if (newFromHand.isDead(maxFingers, exactFive) && !state.ruleset.allowSuicide) return false
+        // Suicide: emptying the giving hand, or pushing the receiving hand to the limit, kills your own hand
+        val killsOwnHand = Hand(newFromFingers).isDead(maxFingers, exactFive) || Hand(newToFingers).isDead(maxFingers, exactFive)
+        if (killsOwnHand && !state.ruleset.allowSuicide) return false
         if (exactFive && newToFingers > maxFingers) return false
 
         // Wikipedia Identity/Swap Rule: Forbids moves that just swap hand values or keep them identical.
