@@ -64,7 +64,8 @@ object HintAnalyzer {
             val line = solver.line(state, move)
             MoveAnalysis(
                 move = move,
-                action = action(state, move, me),
+                // The card is always about your own move, so drop the subject: "Attack their 3 …"
+                action = action(state, move, me).removePrefix("You ").replaceFirstChar(Char::uppercase),
                 effect = effect(state, after, move, me),
                 evaluation = moveEval,
                 isBest = false,
@@ -102,17 +103,10 @@ object HintAnalyzer {
     }
 
     private fun verdict(e: Evaluation): String = when (e.outcome) {
-        Outcome.WIN -> if (e.plies == 1) {
-            "You can win with this move."
-        } else {
-            "You can force a win: play the moves marked BEST and the game ends in your favour within ${e.plies} moves, whatever they do."
-        }
-        Outcome.DRAW ->
-            "Neither side can force a win from here. Moves marked DRAW keep it that way; any move marked LOSS gives them a forced win."
-        Outcome.LOSS ->
-            "They can force a win from here, within ${e.plies} moves at most. The moves marked BEST hold out longest, giving them the most chances to go wrong."
+        Outcome.WIN -> if (e.plies == 1) "You can win right now." else "Forced win in ${e.plies} moves."
+        Outcome.DRAW -> "Draw with best play. Avoid any move marked LOSS."
+        Outcome.LOSS -> "Forced loss in ${e.plies} moves at most. BEST holds out longest."
     }
-
     private fun rank(e: Evaluation): Int = when (e.outcome) {
         Outcome.WIN -> e.plies!!
         Outcome.DRAW -> 10_000
@@ -195,28 +189,13 @@ object HintAnalyzer {
         last?.winnerId == me -> "You win."
         last?.winnerId != null -> "They win."
         last != null && RulesEngine.legalMoves(last).isEmpty() -> "No legal moves left: the game is a draw."
-        e.outcome == Outcome.DRAW -> "…and so on. Neither side can force a win, so with perfect play the position keeps repeating (a draw)."
+        e.outcome == Outcome.DRAW -> "…neither side can force a win: draw."
         else -> ""
     }
 
-    private fun ruleNotes(state: GameState): List<String> {
-        val r = state.ruleset
-        val notes = mutableListOf<String>()
-        notes += when {
-            r.overflow -> {
-                val a = r.maxFingers - 1
-                val b = minOf(2, a)
-                "Rollover: a total of exactly ${r.maxFingers} knocks a hand out; more than ${r.maxFingers} wraps around " +
-                    "(e.g. $a + $b = ${a + b} → ${(a + b) % r.maxFingers})."
-            }
-            r.exactFive -> "Exact limit: a total of exactly ${r.maxFingers} knocks a hand out; attacks that would go over ${r.maxFingers} aren't allowed."
-            else -> "Cutoff: a total of ${r.maxFingers} or more knocks a hand out."
-        }
-        if (r.isMisere) notes += "Misère: the first player to lose both hands WINS."
-        notes += "Move counts include both players' moves. Hands are shown left|right."
-        return notes
-    }
-
+    /** Only rules that flip how a position reads; the rest the player already knows from the board. */
+    private fun ruleNotes(state: GameState): List<String> =
+        if (state.ruleset.isMisere) listOf("Misère: losing both hands wins.") else emptyList()
     private fun sentence(action: String, effect: String) = "$action: $effect"
 
     private fun hands(state: GameState, me: String): String {

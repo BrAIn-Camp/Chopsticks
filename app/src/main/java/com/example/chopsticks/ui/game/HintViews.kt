@@ -95,8 +95,9 @@ private fun outcomeColor(outcome: Outcome, theme: HandTheme): Color = when (outc
 }
 
 /**
- * The full analysis: verdict, what's threatened right now, and every legal move with its
- * consequences and the complete perfect-play line.
+ * The analysis, kept compact: a one-line verdict, any immediate knockouts, then every legal move
+ * as a single row (best first). Tapping a row expands its reasons: what it leaves open, what it
+ * threatens, the opponent's best reply, and (behind one more tap) the full perfect-play line.
  */
 @Composable
 fun HintPanel(
@@ -106,6 +107,8 @@ fun HintPanel(
     onPlay: (Move) -> Unit,
     onClose: () -> Unit
 ) {
+    // The first best move starts open; the rest are one line each until tapped
+    var expanded by remember(analysis) { mutableStateOf(analysis.moves.firstOrNull()?.move) }
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -117,139 +120,123 @@ fun HintPanel(
         LazyColumn(
             modifier = Modifier
                 .fillMaxWidth()
-                .fillMaxHeight(0.9f)
+                .heightIn(max = 620.dp)
                 .background(theme.backgroundColor, RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
                 .border(1.dp, theme.primaryColor.copy(alpha = 0.6f), RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
                 .navigationBarsPadding(),
             contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             item {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        "ANALYSIS",
-                        color = theme.primaryColor,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Black,
-                        letterSpacing = 2.sp,
-                        modifier = Modifier.weight(1f)
-                    )
+                    Column(Modifier.weight(1f)) {
+                        Text(analysis.hands, color = theme.textColor, fontFamily = FontFamily.Monospace, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
+                            ResultBadge(HintAnalyzer.resultLabel(analysis.evaluation), analysis.evaluation.outcome, theme)
+                            Spacer(Modifier.width(8.dp))
+                            Text(analysis.verdict, color = theme.textColor, fontSize = 13.sp, lineHeight = 17.sp)
+                        }
+                    }
                     ArtisticActionButton(text = "CLOSE", onClick = onClose, theme = theme)
                 }
             }
 
-            item {
-                Text(analysis.hands, color = theme.textColor, fontFamily = FontFamily.Monospace, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-            }
-
-            item {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .border(2.dp, outcomeColor(analysis.evaluation.outcome, theme), RoundedCornerShape(8.dp))
-                        .padding(12.dp)
-                ) {
-                    ResultBadge(HintAnalyzer.resultLabel(analysis.evaluation), analysis.evaluation.outcome, theme)
-                    Spacer(Modifier.height(6.dp))
-                    Text(analysis.verdict, color = theme.textColor, fontSize = 15.sp, lineHeight = 21.sp)
-                }
-            }
-
-            item {
-                FactList("YOU CAN KNOCK OUT NOW", analysis.chances, "Nothing: no attack of yours knocks out a hand this move.", theme)
-            }
-            item {
-                FactList("THEY THREATEN (if you leave it)", analysis.dangers, "Nothing: none of their attacks would knock out a hand of yours.", theme)
-            }
-
-            item {
-                Column {
-                    analysis.ruleNotes.forEach {
-                        Text("• $it", color = theme.textColor.copy(alpha = 0.6f), fontSize = 12.sp, lineHeight = 16.sp)
+            if (analysis.chances.isNotEmpty() || analysis.dangers.isNotEmpty() || analysis.ruleNotes.isNotEmpty()) {
+                item {
+                    Column {
+                        analysis.chances.forEach { Fact("Can knock out", it, outcomeColor(Outcome.WIN, theme), theme) }
+                        analysis.dangers.forEach { Fact("Threatened", it, outcomeColor(Outcome.LOSS, theme), theme) }
+                        analysis.ruleNotes.forEach { Text(it, color = theme.textColor.copy(alpha = 0.6f), fontSize = 12.sp) }
                     }
                 }
             }
 
-            item {
-                Text(
-                    "ALL YOUR MOVES (${analysis.moves.size}), BEST FIRST",
-                    color = theme.primaryColor,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Black,
-                    letterSpacing = 1.sp
-                )
-            }
-
             items(analysis.moves) { move ->
-                MoveCard(move, theme, onShowOnBoard, onPlay)
+                MoveRow(
+                    move = move,
+                    theme = theme,
+                    expanded = expanded == move.move,
+                    onToggle = { expanded = if (expanded == move.move) null else move.move },
+                    onShowOnBoard = onShowOnBoard,
+                    onPlay = onPlay
+                )
             }
         }
     }
 }
 
 @Composable
-private fun MoveCard(
+private fun Fact(label: String, text: String, color: Color, theme: HandTheme) {
+    Row(modifier = Modifier.padding(vertical = 1.dp)) {
+        Text("$label: ", color = color, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+        Text(text, color = theme.textColor, fontSize = 12.sp)
+    }
+}
+
+/** One move: a single line until tapped, then its reasons and the line of play. */
+@Composable
+private fun MoveRow(
     move: MoveAnalysis,
     theme: HandTheme,
+    expanded: Boolean,
+    onToggle: () -> Unit,
     onShowOnBoard: (Move) -> Unit,
     onPlay: (Move) -> Unit
 ) {
     val color = outcomeColor(move.evaluation.outcome, theme)
+    var showLine by remember(move) { mutableStateOf(false) }
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .background(theme.secondaryColor.copy(alpha = if (theme.isDark) 0.35f else 0.25f), RoundedCornerShape(8.dp))
-            .border(if (move.isBest) 2.dp else 1.dp, color.copy(alpha = if (move.isBest) 1f else 0.5f), RoundedCornerShape(8.dp))
-            .padding(12.dp)
+            .border(if (move.isBest) 2.dp else 1.dp, color.copy(alpha = if (move.isBest) 1f else 0.4f), RoundedCornerShape(8.dp))
+            .clickable { onToggle() }
+            .padding(10.dp)
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            ResultBadge(HintAnalyzer.resultLabel(move.evaluation), move.evaluation.outcome, theme)
-            if (move.isBest) {
-                Text(
-                    "BEST",
-                    color = theme.backgroundColor,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Black,
-                    modifier = Modifier
-                        .background(theme.primaryColor, RoundedCornerShape(4.dp))
-                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                )
-            }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            ResultBadge(if (move.isBest) "BEST · " + HintAnalyzer.resultLabel(move.evaluation) else HintAnalyzer.resultLabel(move.evaluation), move.evaluation.outcome, theme)
+            Spacer(Modifier.width(8.dp))
+            Text(if (expanded) "▾" else "▸", color = theme.textColor.copy(alpha = 0.5f), fontSize = 12.sp)
         }
-        Spacer(Modifier.height(8.dp))
-        Text(move.action, color = theme.textColor, fontSize = 15.sp, fontWeight = FontWeight.Bold, lineHeight = 20.sp)
-        Text(move.effect, color = theme.textColor.copy(alpha = 0.85f), fontSize = 14.sp, lineHeight = 19.sp)
+        Text(move.action, color = theme.textColor, fontSize = 14.sp, fontWeight = FontWeight.Bold, lineHeight = 18.sp, modifier = Modifier.padding(top = 4.dp))
+        Text(move.effect, color = theme.textColor.copy(alpha = 0.8f), fontSize = 13.sp, lineHeight = 17.sp)
 
-        Spacer(Modifier.height(8.dp))
-        FactList("LEAVES OPEN", move.leavesOpen, "Nothing of yours can be knocked out on their next move.", theme, compact = true)
-        Spacer(Modifier.height(4.dp))
-        FactList("THREATENS NEXT", move.threatens, "No knockout threat against them.", theme, compact = true)
-
-        Spacer(Modifier.height(8.dp))
-        Text("PERFECT PLAY FROM HERE", color = theme.textColor.copy(alpha = 0.6f), fontSize = 11.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
-        move.line.forEachIndexed { i, step ->
-            Row(modifier = Modifier.padding(top = 4.dp)) {
+        if (expanded) {
+            Spacer(Modifier.height(6.dp))
+            move.leavesOpen.forEach { Fact("Exposes", it, outcomeColor(Outcome.LOSS, theme), theme) }
+            move.threatens.forEach { Fact("Threatens", it, outcomeColor(Outcome.WIN, theme), theme) }
+            // Their best reply is usually the whole reason a move is good or bad
+            move.line.getOrNull(1)?.let { reply ->
+                Fact("Best reply", reply.description.removePrefix("They ").replaceFirstChar(Char::uppercase), theme.primaryColor, theme)
+            }
+            if (move.line.size > 2) {
                 Text(
-                    "${i + 1}.",
-                    color = if (step.byYou) theme.primaryColor else theme.textColor.copy(alpha = 0.6f),
-                    fontSize = 13.sp,
+                    if (showLine) "▾ Full line (${move.line.size} moves)" else "▸ Full line (${move.line.size} moves)",
+                    color = theme.primaryColor,
+                    fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
-                    modifier = Modifier.width(28.dp)
+                    modifier = Modifier.padding(top = 4.dp).clickable { showLine = !showLine }
                 )
-                Column {
-                    Text(step.description, color = theme.textColor, fontSize = 13.sp, lineHeight = 17.sp)
-                    Text(step.handsAfter, color = theme.textColor.copy(alpha = 0.6f), fontSize = 12.sp, fontFamily = FontFamily.Monospace)
+                if (showLine) {
+                    move.line.forEachIndexed { i, step ->
+                        Text(
+                            "${i + 1}. ${step.description}  →  ${step.handsAfter}",
+                            color = if (step.byYou) theme.textColor else theme.textColor.copy(alpha = 0.7f),
+                            fontSize = 12.sp,
+                            lineHeight = 16.sp,
+                            modifier = Modifier.padding(top = 2.dp)
+                        )
+                    }
                 }
             }
-        }
-        if (move.lineEnd.isNotEmpty()) {
-            Text(move.lineEnd, color = color, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 6.dp))
-        }
-
-        Spacer(Modifier.height(10.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            ArtisticActionButton(text = "SHOW ON BOARD", onClick = { onShowOnBoard(move.move) }, theme = theme)
-            ArtisticActionButton(text = "PLAY IT", onClick = { onPlay(move.move) }, theme = theme)
+            if (move.lineEnd.isNotEmpty()) {
+                Text(move.lineEnd, color = color, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 4.dp))
+            }
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ArtisticActionButton(text = "SHOW", onClick = { onShowOnBoard(move.move) }, theme = theme)
+                ArtisticActionButton(text = "PLAY IT", onClick = { onPlay(move.move) }, theme = theme)
+            }
         }
     }
 }
@@ -297,22 +284,4 @@ private fun ResultBadge(label: String, outcome: Outcome, theme: HandTheme) {
             .border(1.5.dp, outcomeColor(outcome, theme), RoundedCornerShape(4.dp))
             .padding(horizontal = 6.dp, vertical = 2.dp)
     )
-}
-
-@Composable
-private fun FactList(title: String, facts: List<String>, emptyText: String, theme: HandTheme, compact: Boolean = false) {
-    Column {
-        Text(
-            title,
-            color = theme.textColor.copy(alpha = 0.6f),
-            fontSize = if (compact) 11.sp else 12.sp,
-            fontWeight = FontWeight.Black,
-            letterSpacing = 1.sp
-        )
-        if (facts.isEmpty()) {
-            Text(emptyText, color = theme.textColor.copy(alpha = 0.75f), fontSize = 13.sp, lineHeight = 17.sp)
-        } else {
-            facts.forEach { Text("• $it", color = theme.textColor, fontSize = if (compact) 13.sp else 14.sp, lineHeight = 18.sp) }
-        }
-    }
 }

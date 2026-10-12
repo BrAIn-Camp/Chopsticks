@@ -43,7 +43,7 @@ class HintAnalyzerTest {
     @Test
     fun `explains the arithmetic of an attack`() {
         val knockout = analysis.moves.first { it.move == Move.Attack("Player 1", 0, 0) }
-        assertEquals("You attack their 3 (left) with your 2 (left)", knockout.action)
+        assertEquals("Attack their 3 (left) with your 2 (left)", knockout.action)
         assertEquals("3 + 2 = 5: their left hand is knocked out", knockout.effect)
     }
 
