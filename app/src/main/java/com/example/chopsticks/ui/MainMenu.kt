@@ -11,7 +11,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Settings
@@ -42,6 +41,9 @@ import com.example.chopsticks.domain.model.GameMode
 import com.example.chopsticks.domain.model.RulesetConfig
 import com.example.chopsticks.ui.screens.DynamicBackground
 import com.example.chopsticks.ui.theme.*
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.platform.LocalDensity
 
 @Composable
 fun MainMenu(
@@ -50,7 +52,6 @@ fun MainMenu(
     onThemeChange: (HandTheme) -> Unit,
     onStartGame: (GameMode) -> Unit,
     onGameRules: () -> Unit,
-    onHowToPlay: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val safeTheme = currentTheme ?: HandTheme.Default
@@ -87,7 +88,20 @@ fun MainMenu(
                     modifier = Modifier.size(width = 320.dp * scale, height = 120.dp * scale)
                 )
 
-                // Title Text
+                // Title Text. Its size is fitted to the space it actually has: "sp" text grows with
+                // the system font-size setting and serif themes set wider letters, so scaling by
+                // screen width alone let it overflow its frame on some devices.
+                val titleStyle = LocalTextStyle.current.merge(
+                    TextStyle(fontSize = 40.sp, fontWeight = FontWeight.Black, letterSpacing = 4.sp)
+                )
+                val textMeasurer = rememberTextMeasurer()
+                val density = LocalDensity.current
+                val fit = remember(maxWidth, titleStyle, density) {
+                    val natural = textMeasurer.measure("CHOPSTICKS", titleStyle, maxLines = 1, softWrap = false).size.width
+                    val frame = with(density) { ((32.dp + 3.dp) * (2f * scale) + 8.dp).toPx() }
+                    val available = with(density) { maxWidth.toPx() } - frame
+                    (available / natural).coerceIn(0.1f, 1f)
+                }
                 Box(
                     modifier = Modifier
                         .border(3.dp * scale, safeTheme.primaryColor)
@@ -97,9 +111,7 @@ fun MainMenu(
                     Text(
                         text = "CHOPSTICKS",
                         color = safeTheme.textColor,
-                        fontSize = 40.sp * scale,
-                        fontWeight = FontWeight.Black,
-                        letterSpacing = 4.sp * scale,
+                        style = titleStyle.copy(fontSize = 40.sp * fit, letterSpacing = 4.sp * fit),
                         maxLines = 1,
                         softWrap = false,
                         textAlign = TextAlign.Center
@@ -166,19 +178,6 @@ fun MainMenu(
                         Text("GAME RULES", fontSize = 13.sp)
                     }
 
-                    OutlinedButton(
-                        onClick = onHowToPlay,
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(56.dp),
-                        shape = RoundedCornerShape(safeTheme.cornerRadius),
-                        border = BorderStroke(1.dp, safeTheme.textColor.copy(alpha = 0.5f)),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = safeTheme.textColor)
-                    ) {
-                        Icon(Icons.Rounded.Info, contentDescription = null, modifier = Modifier.size(20.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("HOW TO PLAY", fontSize = 13.sp)
-                    }
                 }
             }
             
@@ -224,8 +223,7 @@ fun MainMenuPreview() {
         currentTheme = HandTheme.Default,
         onThemeChange = {},
         onStartGame = { },
-        onGameRules = {},
-        onHowToPlay = {}
+        onGameRules = {}
     )
 }
 
@@ -237,7 +235,6 @@ fun MainMenuSmallPreview() {
         currentTheme = HandTheme.Default,
         onThemeChange = {},
         onStartGame = { },
-        onGameRules = {},
-        onHowToPlay = {}
+        onGameRules = {}
     )
 }

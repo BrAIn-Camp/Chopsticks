@@ -13,7 +13,6 @@ import com.example.chopsticks.domain.model.GameMode
 import androidx.navigation3.ui.NavDisplay
 import com.example.chopsticks.ui.MainMenu
 import com.example.chopsticks.ui.ConfigurationScreen
-import com.example.chopsticks.ui.RuleGuide
 import com.example.chopsticks.domain.model.Difficulty
 import com.example.chopsticks.ui.game.GameScreen
 import com.example.chopsticks.ui.game.GameViewModel
@@ -33,8 +32,6 @@ sealed interface ChopsticksRoute : NavKey {
     @Serializable
     data object Configuration : ChopsticksRoute
 
-    @Serializable
-    data object RuleGuide : ChopsticksRoute
 
     @Serializable
     data class Game(
@@ -85,9 +82,6 @@ class MainActivity : ComponentActivity() {
                                         },
                                         onGameRules = {
                                             backStack.add(ChopsticksRoute.Configuration)
-                                        },
-                                        onHowToPlay = {
-                                            backStack.add(ChopsticksRoute.RuleGuide)
                                         }
                                     )
                                 }
@@ -104,16 +98,6 @@ class MainActivity : ComponentActivity() {
                                             if (backStack.size > 1) backStack.removeLastOrNull()
                                         },
                                         theme = currentTheme
-                                    )
-                                }
-                            }
-                            is ChopsticksRoute.RuleGuide -> {
-                                NavEntry(key) {
-                                    RuleGuide(
-                                        maxFingers = rulesetConfig.maxFingers,
-                                        onBack = {
-                                            if (backStack.size > 1) backStack.removeLastOrNull()
-                                        }
                                     )
                                 }
                             }
